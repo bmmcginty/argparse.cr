@@ -1,0 +1,8118 @@
+{
+  "cases": [
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {
+            "action": "extend",
+            "nargs": "+",
+            "type": "str"
+          }
+        }
+      ],
+      "documentation": "",
+      "failures": [],
+      "name": "TestActionExtend",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "--foo",
+            "f1",
+            "--foo",
+            "f2",
+            "f3",
+            "f4"
+          ],
+          "namespace": {
+            "foo": [
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "documentation": "Test a user-defined option/argument action",
+      "failures": [],
+      "name": "TestActionUserDefined",
+      "parser": {},
+      "skip": "custom action OptionalAction",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test reading arguments from a file",
+      "failures": [],
+      "name": "TestArgumentsFromFile",
+      "parser": {},
+      "skip": "parser keyword 'fromfile_prefix_chars'",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test reading arguments from a file",
+      "failures": [],
+      "name": "TestArgumentsFromFileConverter",
+      "parser": {},
+      "skip": "parser keyword 'fromfile_prefix_chars'",
+      "successes": []
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {
+            "action": "boolean_optional"
+          }
+        }
+      ],
+      "documentation": "Tests BooleanOptionalAction",
+      "failures": [
+        [
+          "--foo",
+          "bar"
+        ],
+        [
+          "--foo=bar"
+        ]
+      ],
+      "name": "TestBooleanOptionalAction",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "--foo"
+          ],
+          "namespace": {
+            "foo": true
+          }
+        },
+        {
+          "argv": [
+            "--no-foo"
+          ],
+          "namespace": {
+            "foo": false
+          }
+        },
+        {
+          "argv": [
+            "--foo",
+            "--no-foo"
+          ],
+          "namespace": {
+            "foo": false
+          }
+        },
+        {
+          "argv": [
+            "--no-foo",
+            "--foo"
+          ],
+          "namespace": {
+            "foo": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {
+            "action": "boolean_optional",
+            "required": true
+          }
+        }
+      ],
+      "documentation": "Tests BooleanOptionalAction required",
+      "failures": [
+        []
+      ],
+      "name": "TestBooleanOptionalActionRequired",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "--foo"
+          ],
+          "namespace": {
+            "foo": true
+          }
+        },
+        {
+          "argv": [
+            "--no-foo"
+          ],
+          "namespace": {
+            "foo": false
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-f"
+          ],
+          "kwargs": {
+            "action": "append_const"
+          }
+        },
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {
+            "action": "append_const"
+          }
+        },
+        {
+          "args": [
+            "-b"
+          ],
+          "kwargs": {
+            "action": "store_const"
+          }
+        },
+        {
+          "args": [
+            "--bar"
+          ],
+          "kwargs": {
+            "action": "store_const"
+          }
+        }
+      ],
+      "documentation": "Tests that const gets default value of None when not provided",
+      "failures": [
+        [
+          "-f",
+          "v"
+        ],
+        [
+          "--foo=bar"
+        ],
+        [
+          "--foo",
+          "bar"
+        ]
+      ],
+      "name": "TestConstActionsMissingConstKwarg",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "b": null,
+            "bar": null,
+            "f": null,
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "-f"
+          ],
+          "namespace": {
+            "b": null,
+            "bar": null,
+            "f": [
+              null
+            ],
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "--foo"
+          ],
+          "namespace": {
+            "b": null,
+            "bar": null,
+            "f": null,
+            "foo": [
+              null
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-b"
+          ],
+          "namespace": {
+            "b": null,
+            "bar": null,
+            "f": null,
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "--bar"
+          ],
+          "namespace": {
+            "b": null,
+            "bar": null,
+            "f": null,
+            "foo": null
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "default": {
+              "__suppress__": true
+            },
+            "nargs": "?",
+            "type": "int"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "default": {
+              "__suppress__": true
+            },
+            "nargs": "*",
+            "type": "int"
+          }
+        },
+        {
+          "args": [
+            "--baz"
+          ],
+          "kwargs": {
+            "action": "store_true",
+            "default": {
+              "__suppress__": true
+            }
+          }
+        },
+        {
+          "args": [
+            "--qux"
+          ],
+          "kwargs": {
+            "default": {
+              "__suppress__": true
+            },
+            "nargs": "?",
+            "type": "int"
+          }
+        },
+        {
+          "args": [
+            "--quux"
+          ],
+          "kwargs": {
+            "default": {
+              "__suppress__": true
+            },
+            "nargs": "*",
+            "type": "int"
+          }
+        }
+      ],
+      "documentation": "Test actions with suppressed defaults",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "a"
+        ],
+        [
+          "1",
+          "a"
+        ]
+      ],
+      "name": "TestDefaultSuppress",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {}
+        },
+        {
+          "argv": [
+            "1"
+          ],
+          "namespace": {
+            "foo": 1
+          }
+        },
+        {
+          "argv": [
+            "1",
+            "2"
+          ],
+          "namespace": {
+            "bar": [
+              2
+            ],
+            "foo": 1
+          }
+        },
+        {
+          "argv": [
+            "--baz"
+          ],
+          "namespace": {
+            "baz": true
+          }
+        },
+        {
+          "argv": [
+            "1",
+            "--baz"
+          ],
+          "namespace": {
+            "baz": true,
+            "foo": 1
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "1",
+            "2"
+          ],
+          "namespace": {
+            "bar": [
+              2
+            ],
+            "baz": true,
+            "foo": 1
+          }
+        },
+        {
+          "argv": [
+            "--qux"
+          ],
+          "namespace": {
+            "qux": null
+          }
+        },
+        {
+          "argv": [
+            "--qux",
+            "1"
+          ],
+          "namespace": {
+            "qux": 1
+          }
+        },
+        {
+          "argv": [
+            "--quux"
+          ],
+          "namespace": {
+            "quux": []
+          }
+        },
+        {
+          "argv": [
+            "--quux",
+            "1",
+            "2"
+          ],
+          "namespace": {
+            "quux": [
+              1,
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-r"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-c"
+          ],
+          "kwargs": {
+            "action": "count"
+          }
+        }
+      ],
+      "documentation": "Do not allow abbreviations of long options at all",
+      "failures": [
+        [
+          "-r"
+        ],
+        [
+          "-c",
+          "-r"
+        ]
+      ],
+      "name": "TestDisallowLongAbbreviationAllowsShortGrouping",
+      "parser": {
+        "allow_abbrev": false
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "c": null,
+            "r": null
+          }
+        },
+        {
+          "argv": [
+            "-ra"
+          ],
+          "namespace": {
+            "c": null,
+            "r": "a"
+          }
+        },
+        {
+          "argv": [
+            "-rcc"
+          ],
+          "namespace": {
+            "c": null,
+            "r": "cc"
+          }
+        },
+        {
+          "argv": [
+            "-cc"
+          ],
+          "namespace": {
+            "c": 2,
+            "r": null
+          }
+        },
+        {
+          "argv": [
+            "-cc",
+            "-ra"
+          ],
+          "namespace": {
+            "c": 2,
+            "r": "a"
+          }
+        },
+        {
+          "argv": [
+            "-ccrcc"
+          ],
+          "namespace": {
+            "c": 2,
+            "r": "cc"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "+r"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "+c"
+          ],
+          "kwargs": {
+            "action": "count"
+          }
+        }
+      ],
+      "documentation": "Short option grouping works with custom prefix and allow_abbrev=False",
+      "failures": [
+        [
+          "+r"
+        ],
+        [
+          "+c",
+          "+r"
+        ]
+      ],
+      "name": "TestDisallowLongAbbreviationAllowsShortGroupingPrefix",
+      "parser": {
+        "allow_abbrev": false,
+        "prefix_chars": "+"
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "c": null,
+            "r": null
+          }
+        },
+        {
+          "argv": [
+            "+ra"
+          ],
+          "namespace": {
+            "c": null,
+            "r": "a"
+          }
+        },
+        {
+          "argv": [
+            "+rcc"
+          ],
+          "namespace": {
+            "c": null,
+            "r": "cc"
+          }
+        },
+        {
+          "argv": [
+            "+cc"
+          ],
+          "namespace": {
+            "c": 2,
+            "r": null
+          }
+        },
+        {
+          "argv": [
+            "+cc",
+            "+ra"
+          ],
+          "namespace": {
+            "c": 2,
+            "r": "a"
+          }
+        },
+        {
+          "argv": [
+            "+ccrcc"
+          ],
+          "namespace": {
+            "c": 2,
+            "r": "cc"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "x"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "-y",
+            "--yyy"
+          ],
+          "kwargs": {
+            "dest": "y"
+          }
+        }
+      ],
+      "documentation": "",
+      "failures": [
+        [
+          "-y"
+        ]
+      ],
+      "name": "TestEmptyAndSpaceContainingArguments",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            ""
+          ],
+          "namespace": {
+            "x": "",
+            "y": null
+          }
+        },
+        {
+          "argv": [
+            "a badger"
+          ],
+          "namespace": {
+            "x": "a badger",
+            "y": null
+          }
+        },
+        {
+          "argv": [
+            "-a badger"
+          ],
+          "namespace": {
+            "x": "-a badger",
+            "y": null
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            ""
+          ],
+          "namespace": {
+            "x": null,
+            "y": ""
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "a badger"
+          ],
+          "namespace": {
+            "x": null,
+            "y": "a badger"
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "-a badger"
+          ],
+          "namespace": {
+            "x": null,
+            "y": "-a badger"
+          }
+        },
+        {
+          "argv": [
+            "--yyy=a badger"
+          ],
+          "namespace": {
+            "x": null,
+            "y": "a badger"
+          }
+        },
+        {
+          "argv": [
+            "--yyy=-a badger"
+          ],
+          "namespace": {
+            "x": null,
+            "y": "-a badger"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "documentation": "Test that a file is not created unless the default is needed",
+      "failures": [],
+      "name": "TestFileTypeDefaults",
+      "parser": {},
+      "skip": "type FileType('r')",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test the FileType option/argument type for reading files",
+      "failures": [],
+      "name": "TestFileTypeR",
+      "parser": {},
+      "skip": "type FileType('r')",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test the FileType option/argument type for reading files",
+      "failures": [],
+      "name": "TestFileTypeRB",
+      "parser": {},
+      "skip": "type FileType('rb')",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test the FileType option/argument type for writing files",
+      "failures": [],
+      "name": "TestFileTypeW",
+      "parser": {},
+      "skip": "type FileType('w')",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test the FileType option/argument type for writing binary files",
+      "failures": [],
+      "name": "TestFileTypeWB",
+      "parser": {},
+      "skip": "type FileType('wb')",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test the FileType option/argument type for writing new files only",
+      "failures": [],
+      "name": "TestFileTypeX",
+      "parser": {},
+      "skip": "type FileType('x')",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test the FileType option/argument type for writing new binary files only",
+      "failures": [],
+      "name": "TestFileTypeXB",
+      "parser": {},
+      "skip": "type FileType('xb')",
+      "successes": []
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "y"
+          ],
+          "kwargs": {
+            "nargs": "..."
+          }
+        },
+        {
+          "args": [
+            "-z"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Tests specifying a positional with nargs=REMAINDER",
+      "failures": [
+        [],
+        [
+          "-z"
+        ],
+        [
+          "-z",
+          "Z"
+        ]
+      ],
+      "name": "TestNargsRemainder",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "X"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [],
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "-z",
+            "Z",
+            "X"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [],
+            "z": "Z"
+          }
+        },
+        {
+          "argv": [
+            "-z",
+            "Z",
+            "X",
+            "A",
+            "B"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [
+              "A",
+              "B"
+            ],
+            "z": "Z"
+          }
+        },
+        {
+          "argv": [
+            "X",
+            "-z",
+            "Z",
+            "A",
+            "B"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [
+              "-z",
+              "Z",
+              "A",
+              "B"
+            ],
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "X",
+            "A",
+            "-z",
+            "Z",
+            "B"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [
+              "A",
+              "-z",
+              "Z",
+              "B"
+            ],
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "X",
+            "A",
+            "B",
+            "-z",
+            "Z"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [
+              "A",
+              "B",
+              "-z",
+              "Z"
+            ],
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "X",
+            "Y",
+            "--foo"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": [
+              "Y",
+              "--foo"
+            ],
+            "z": null
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "y"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Tests specifying args for an Optional that accepts zero or more",
+      "failures": [],
+      "name": "TestNargsZeroOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": []
+          }
+        },
+        {
+          "argv": [
+            "-x"
+          ],
+          "namespace": {
+            "x": [],
+            "y": []
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a"
+          ],
+          "namespace": {
+            "x": [
+              "a"
+            ],
+            "y": []
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a",
+            "--",
+            "b"
+          ],
+          "namespace": {
+            "x": [
+              "a"
+            ],
+            "y": [
+              "b"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "x": null,
+            "y": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x"
+          ],
+          "namespace": {
+            "x": [],
+            "y": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "b"
+          ],
+          "namespace": {
+            "x": [
+              "b"
+            ],
+            "y": [
+              "a"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "documentation": "Test parsing negative numbers",
+      "failures": [],
+      "name": "TestNegativeNumber",
+      "parser": {},
+      "skip": "type 'complex'",
+      "successes": []
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "type": "float"
+          }
+        },
+        {
+          "args": [
+            "-3"
+          ],
+          "kwargs": {
+            "dest": "y",
+            "type": "float"
+          }
+        },
+        {
+          "args": [
+            "z"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Tests options that may or may not be arguments",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "-y2.5"
+        ],
+        [
+          "-xa"
+        ],
+        [
+          "-x",
+          "-a"
+        ],
+        [
+          "-x",
+          "-3"
+        ],
+        [
+          "-x",
+          "-3.5"
+        ],
+        [
+          "-3",
+          "-3.5"
+        ],
+        [
+          "-x",
+          "-2.5"
+        ],
+        [
+          "-x",
+          "-2.5",
+          "a"
+        ],
+        [
+          "-3",
+          "-.5"
+        ],
+        [
+          "a",
+          "x",
+          "-1"
+        ],
+        [
+          "-x",
+          "-1",
+          "a"
+        ],
+        [
+          "-3",
+          "-1",
+          "a"
+        ]
+      ],
+      "name": "TestOptionLike",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": null,
+            "z": []
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "2.5"
+          ],
+          "namespace": {
+            "x": 2.5,
+            "y": null,
+            "z": []
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "2.5",
+            "a"
+          ],
+          "namespace": {
+            "x": 2.5,
+            "y": null,
+            "z": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-3.5"
+          ],
+          "namespace": {
+            "x": null,
+            "y": 0.5,
+            "z": []
+          }
+        },
+        {
+          "argv": [
+            "-3-.5"
+          ],
+          "namespace": {
+            "x": null,
+            "y": -0.5,
+            "z": []
+          }
+        },
+        {
+          "argv": [
+            "-3",
+            ".5"
+          ],
+          "namespace": {
+            "x": null,
+            "y": 0.5,
+            "z": []
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-3.5"
+          ],
+          "namespace": {
+            "x": null,
+            "y": 0.5,
+            "z": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "x": null,
+            "y": null,
+            "z": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "1"
+          ],
+          "namespace": {
+            "x": 1.0,
+            "y": null,
+            "z": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "1",
+            "a"
+          ],
+          "namespace": {
+            "x": 1.0,
+            "y": null,
+            "z": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-3",
+            "1",
+            "a"
+          ],
+          "namespace": {
+            "x": null,
+            "y": 1.0,
+            "z": [
+              "a"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--baz"
+          ],
+          "kwargs": {
+            "action": "append"
+          }
+        }
+      ],
+      "documentation": "Tests the append action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "--baz"
+        ],
+        [
+          "a",
+          "--baz"
+        ],
+        [
+          "--baz",
+          "a",
+          "b"
+        ]
+      ],
+      "name": "TestOptionalsActionAppend",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "baz": null
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "a"
+          ],
+          "namespace": {
+            "baz": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "a",
+            "--baz",
+            "b"
+          ],
+          "namespace": {
+            "baz": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-b"
+          ],
+          "kwargs": {
+            "action": "append_const",
+            "const": "<pyobject type>"
+          }
+        },
+        {
+          "args": [
+            "-c"
+          ],
+          "kwargs": {
+            "action": "append",
+            "dest": "b"
+          }
+        }
+      ],
+      "documentation": "Tests the append_const action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-c"
+        ],
+        [
+          "a",
+          "-c"
+        ],
+        [
+          "-bx"
+        ],
+        [
+          "-b",
+          "x"
+        ]
+      ],
+      "name": "TestOptionalsActionAppendConst",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "b": null
+          }
+        },
+        {
+          "argv": [
+            "-b"
+          ],
+          "namespace": {
+            "b": [
+              "<pyobject type>"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-b",
+            "-cx",
+            "-b",
+            "-cyz"
+          ],
+          "namespace": {
+            "b": [
+              "<pyobject type>",
+              "x",
+              "<pyobject type>",
+              "yz"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-b"
+          ],
+          "kwargs": {
+            "action": "append_const",
+            "const": "<pyobject type>",
+            "default": [
+              "X"
+            ]
+          }
+        },
+        {
+          "args": [
+            "-c"
+          ],
+          "kwargs": {
+            "action": "append",
+            "dest": "b"
+          }
+        }
+      ],
+      "documentation": "Tests the append_const action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-c"
+        ],
+        [
+          "a",
+          "-c"
+        ],
+        [
+          "-bx"
+        ],
+        [
+          "-b",
+          "x"
+        ]
+      ],
+      "name": "TestOptionalsActionAppendConstWithDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "b": [
+              "X"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-b"
+          ],
+          "namespace": {
+            "b": [
+              "X",
+              "<pyobject type>"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-b",
+            "-cx",
+            "-b",
+            "-cyz"
+          ],
+          "namespace": {
+            "b": [
+              "X",
+              "<pyobject type>",
+              "x",
+              "<pyobject type>",
+              "yz"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--baz"
+          ],
+          "kwargs": {
+            "action": "append",
+            "default": [
+              "X"
+            ]
+          }
+        }
+      ],
+      "documentation": "Tests the append action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "--baz"
+        ],
+        [
+          "a",
+          "--baz"
+        ],
+        [
+          "--baz",
+          "a",
+          "b"
+        ]
+      ],
+      "name": "TestOptionalsActionAppendWithDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "baz": [
+              "X"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "a"
+          ],
+          "namespace": {
+            "baz": [
+              "X",
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "a",
+            "--baz",
+            "b"
+          ],
+          "namespace": {
+            "baz": [
+              "X",
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "action": "count"
+          }
+        }
+      ],
+      "documentation": "Tests the count action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-x",
+          "a"
+        ],
+        [
+          "-x",
+          "b"
+        ],
+        [
+          "-x",
+          "a",
+          "-x",
+          "b"
+        ]
+      ],
+      "name": "TestOptionalsActionCount",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x"
+          ],
+          "namespace": {
+            "x": 1
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "action": "store"
+          }
+        }
+      ],
+      "documentation": "Tests the store action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "a",
+          "-x"
+        ]
+      ],
+      "name": "TestOptionalsActionStore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-xfoo"
+          ],
+          "namespace": {
+            "x": "foo"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-y"
+          ],
+          "kwargs": {
+            "action": "store_const",
+            "const": "<pyobject type>"
+          }
+        }
+      ],
+      "documentation": "Tests the store_const action for an Optional",
+      "failures": [
+        [
+          "a"
+        ]
+      ],
+      "name": "TestOptionalsActionStoreConst",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "y": null
+          }
+        },
+        {
+          "argv": [
+            "-y"
+          ],
+          "namespace": {
+            "y": "<pyobject type>"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-z"
+          ],
+          "kwargs": {
+            "action": "store_false"
+          }
+        }
+      ],
+      "documentation": "Tests the store_false action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-za"
+        ],
+        [
+          "-z",
+          "a"
+        ]
+      ],
+      "name": "TestOptionalsActionStoreFalse",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "z": true
+          }
+        },
+        {
+          "argv": [
+            "-z"
+          ],
+          "namespace": {
+            "z": false
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--apple"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        }
+      ],
+      "documentation": "Tests the store_true action for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "--apple=b"
+        ],
+        [
+          "--apple",
+          "b"
+        ]
+      ],
+      "name": "TestOptionalsActionStoreTrue",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "apple": false
+          }
+        },
+        {
+          "argv": [
+            "--apple"
+          ],
+          "namespace": {
+            "apple": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "--foobaz"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "--fooble"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        }
+      ],
+      "documentation": "Allow long options to be abbreviated unambiguously",
+      "failures": [
+        [
+          "--foob",
+          "5"
+        ],
+        [
+          "--foob"
+        ]
+      ],
+      "name": "TestOptionalsAllowLongAbbreviation",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null,
+            "foobaz": null,
+            "fooble": false
+          }
+        },
+        {
+          "argv": [
+            "--foo",
+            "7"
+          ],
+          "namespace": {
+            "foo": "7",
+            "foobaz": null,
+            "fooble": false
+          }
+        },
+        {
+          "argv": [
+            "--foo=7"
+          ],
+          "namespace": {
+            "foo": "7",
+            "foobaz": null,
+            "fooble": false
+          }
+        },
+        {
+          "argv": [
+            "--fooba",
+            "a"
+          ],
+          "namespace": {
+            "foo": null,
+            "foobaz": "a",
+            "fooble": false
+          }
+        },
+        {
+          "argv": [
+            "--fooba=a"
+          ],
+          "namespace": {
+            "foo": null,
+            "foobaz": "a",
+            "fooble": false
+          }
+        },
+        {
+          "argv": [
+            "--foobl",
+            "--foo",
+            "g"
+          ],
+          "namespace": {
+            "foo": "g",
+            "foobaz": null,
+            "fooble": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "x"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "-k4"
+          ],
+          "kwargs": {
+            "action": "store_true",
+            "dest": "y"
+          }
+        }
+      ],
+      "documentation": "Tests negative number args when almost numeric options are present",
+      "failures": [
+        [
+          "-k3"
+        ]
+      ],
+      "name": "TestOptionalsAlmostNumericAndPositionals",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": false
+          }
+        },
+        {
+          "argv": [
+            "-2"
+          ],
+          "namespace": {
+            "x": "-2",
+            "y": false
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "x": "a",
+            "y": false
+          }
+        },
+        {
+          "argv": [
+            "-k4"
+          ],
+          "namespace": {
+            "x": null,
+            "y": true
+          }
+        },
+        {
+          "argv": [
+            "-k4",
+            "a"
+          ],
+          "namespace": {
+            "x": "a",
+            "y": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "+f"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "::bar"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "/baz"
+          ],
+          "kwargs": {
+            "action": "store_const",
+            "const": 42
+          }
+        }
+      ],
+      "documentation": "Test an Optional with option strings with custom prefixes",
+      "failures": [
+        [
+          "--bar"
+        ],
+        [
+          "-fbar"
+        ],
+        [
+          "-b",
+          "B"
+        ],
+        [
+          "B"
+        ],
+        [
+          "-f"
+        ],
+        [
+          "--bar",
+          "B"
+        ],
+        [
+          "-baz"
+        ],
+        [
+          "-h"
+        ],
+        [
+          "--help"
+        ],
+        [
+          "+h"
+        ],
+        [
+          "::help"
+        ],
+        [
+          "/help"
+        ]
+      ],
+      "name": "TestOptionalsAlternatePrefixChars",
+      "parser": {
+        "add_help": false,
+        "prefix_chars": "+:/"
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "bar": null,
+            "baz": null,
+            "f": false
+          }
+        },
+        {
+          "argv": [
+            "+f"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": null,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "::ba",
+            "B"
+          ],
+          "namespace": {
+            "bar": "B",
+            "baz": null,
+            "f": false
+          }
+        },
+        {
+          "argv": [
+            "+f",
+            "::bar",
+            "B"
+          ],
+          "namespace": {
+            "bar": "B",
+            "baz": null,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "+f",
+            "/b"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": 42,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "/ba",
+            "+f"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": 42,
+            "f": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "+f"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "::bar"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "/baz"
+          ],
+          "kwargs": {
+            "action": "store_const",
+            "const": 42
+          }
+        }
+      ],
+      "documentation": "When ``-`` not in prefix_chars, default operators created for help\nshould use the prefix_chars in use rather than - or --\nhttp://bugs.python.org/issue9444",
+      "failures": [
+        [
+          "--bar"
+        ],
+        [
+          "-fbar"
+        ],
+        [
+          "-b",
+          "B"
+        ],
+        [
+          "B"
+        ],
+        [
+          "-f"
+        ],
+        [
+          "--bar",
+          "B"
+        ],
+        [
+          "-baz"
+        ]
+      ],
+      "name": "TestOptionalsAlternatePrefixCharsAddedHelp",
+      "parser": {
+        "add_help": true,
+        "prefix_chars": "+:/"
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "bar": null,
+            "baz": null,
+            "f": false
+          }
+        },
+        {
+          "argv": [
+            "+f"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": null,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "::ba",
+            "B"
+          ],
+          "namespace": {
+            "bar": "B",
+            "baz": null,
+            "f": false
+          }
+        },
+        {
+          "argv": [
+            "+f",
+            "::bar",
+            "B"
+          ],
+          "namespace": {
+            "bar": "B",
+            "baz": null,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "+f",
+            "/b"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": 42,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "/ba",
+            "+f"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": 42,
+            "f": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "+y"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "+z"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        }
+      ],
+      "documentation": "Verify that Optionals must be called with their defined prefixes",
+      "failures": [
+        [
+          "-w"
+        ],
+        [
+          "-xyz"
+        ],
+        [
+          "+x"
+        ],
+        [
+          "-y"
+        ],
+        [
+          "+xyz"
+        ]
+      ],
+      "name": "TestOptionalsAlternatePrefixCharsMultipleShortArgs",
+      "parser": {
+        "add_help": false,
+        "prefix_chars": "+-"
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": false,
+            "y": false,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "-x"
+          ],
+          "namespace": {
+            "x": true,
+            "y": false,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "+y",
+            "-x"
+          ],
+          "namespace": {
+            "x": true,
+            "y": true,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "+yz",
+            "-x"
+          ],
+          "namespace": {
+            "x": true,
+            "y": true,
+            "z": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "action": "append",
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "--bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "",
+      "failures": [
+        [
+          "-foo"
+        ]
+      ],
+      "name": "TestOptionalsAndPositionalsAppend",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": null,
+            "foo": [
+              [
+                "a",
+                "b"
+              ]
+            ]
+          }
+        },
+        {
+          "argv": [
+            "--bar",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "a",
+            "foo": [
+              [
+                "b"
+              ]
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "--bar",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              [
+                "a",
+                "b"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "action": "extend",
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "--bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "",
+      "failures": [
+        [
+          "-foo"
+        ]
+      ],
+      "name": "TestOptionalsAndPositionalsExtend",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": null,
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "--bar",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "a",
+            "foo": [
+              "b"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "--bar",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-f"
+          ],
+          "kwargs": {
+            "choices": [
+              "a",
+              "b",
+              "c"
+            ]
+          }
+        },
+        {
+          "args": [
+            "-g"
+          ],
+          "kwargs": {
+            "choices": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "type": "int"
+          }
+        }
+      ],
+      "documentation": "Tests specifying the choices for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-f",
+          "d"
+        ],
+        [
+          "-f",
+          "ab"
+        ],
+        [
+          "-fad"
+        ],
+        [
+          "-ga"
+        ],
+        [
+          "-g",
+          "6"
+        ]
+      ],
+      "name": "TestOptionalsChoices",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "f": null,
+            "g": null
+          }
+        },
+        {
+          "argv": [
+            "-f",
+            "a"
+          ],
+          "namespace": {
+            "f": "a",
+            "g": null
+          }
+        },
+        {
+          "argv": [
+            "-f",
+            "c"
+          ],
+          "namespace": {
+            "f": "c",
+            "g": null
+          }
+        },
+        {
+          "argv": [
+            "-g",
+            "0"
+          ],
+          "namespace": {
+            "f": null,
+            "g": 0
+          }
+        },
+        {
+          "argv": [
+            "-g",
+            "03"
+          ],
+          "namespace": {
+            "f": null,
+            "g": 3
+          }
+        },
+        {
+          "argv": [
+            "-fb",
+            "-g4"
+          ],
+          "namespace": {
+            "f": "b",
+            "g": 4
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-y"
+          ],
+          "kwargs": {
+            "default": 42
+          }
+        }
+      ],
+      "documentation": "Tests specifying a default for an Optional",
+      "failures": [
+        [
+          "a"
+        ]
+      ],
+      "name": "TestOptionalsDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": 42
+          }
+        },
+        {
+          "argv": [
+            "-xx"
+          ],
+          "namespace": {
+            "x": "x",
+            "y": 42
+          }
+        },
+        {
+          "argv": [
+            "-yy"
+          ],
+          "namespace": {
+            "x": null,
+            "y": "y"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo-bar"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "--baz"
+          ],
+          "kwargs": {
+            "dest": "zabbaz"
+          }
+        }
+      ],
+      "documentation": "Tests various means of setting destination",
+      "failures": [
+        [
+          "a"
+        ]
+      ],
+      "name": "TestOptionalsDest",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "--foo-bar",
+            "f"
+          ],
+          "namespace": {
+            "foo_bar": "f",
+            "zabbaz": null
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "g"
+          ],
+          "namespace": {
+            "foo_bar": null,
+            "zabbaz": "g"
+          }
+        },
+        {
+          "argv": [
+            "--foo-bar",
+            "h",
+            "--baz",
+            "i"
+          ],
+          "namespace": {
+            "foo_bar": "h",
+            "zabbaz": "i"
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "j",
+            "--foo-bar",
+            "k"
+          ],
+          "namespace": {
+            "foo_bar": "k",
+            "zabbaz": "j"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "--foodle"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "--foonly"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Do not allow abbreviations of long options at all",
+      "failures": [
+        [
+          "-foon",
+          "3"
+        ],
+        [
+          "--foon",
+          "3"
+        ],
+        [
+          "--food"
+        ],
+        [
+          "--food",
+          "--foo",
+          "2"
+        ]
+      ],
+      "name": "TestOptionalsDisallowLongAbbreviation",
+      "parser": {
+        "allow_abbrev": false
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null,
+            "foodle": false,
+            "foonly": null
+          }
+        },
+        {
+          "argv": [
+            "--foo",
+            "3"
+          ],
+          "namespace": {
+            "foo": "3",
+            "foodle": false,
+            "foonly": null
+          }
+        },
+        {
+          "argv": [
+            "--foonly",
+            "7",
+            "--foodle",
+            "--foo",
+            "2"
+          ],
+          "namespace": {
+            "foo": "2",
+            "foodle": true,
+            "foonly": "7"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "++foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "++foodle"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "++foonly"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Disallowing abbreviations works with alternative prefix characters",
+      "failures": [
+        [
+          "+foon",
+          "3"
+        ],
+        [
+          "++foon",
+          "3"
+        ],
+        [
+          "++food"
+        ],
+        [
+          "++food",
+          "++foo",
+          "2"
+        ]
+      ],
+      "name": "TestOptionalsDisallowLongAbbreviationPrefixChars",
+      "parser": {
+        "allow_abbrev": false,
+        "prefix_chars": "+"
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null,
+            "foodle": false,
+            "foonly": null
+          }
+        },
+        {
+          "argv": [
+            "++foo",
+            "3"
+          ],
+          "namespace": {
+            "foo": "3",
+            "foodle": false,
+            "foonly": null
+          }
+        },
+        {
+          "argv": [
+            "++foonly",
+            "7",
+            "++foodle",
+            "++foo",
+            "2"
+          ],
+          "namespace": {
+            "foo": "2",
+            "foodle": true,
+            "foonly": "7"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-foodle"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "-foonly"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Do not allow abbreviations of long options at all",
+      "failures": [
+        [
+          "-foon",
+          "3"
+        ],
+        [
+          "-food"
+        ],
+        [
+          "-food",
+          "-foo",
+          "2"
+        ]
+      ],
+      "name": "TestOptionalsDisallowSingleDashLongAbbreviation",
+      "parser": {
+        "allow_abbrev": false
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null,
+            "foodle": false,
+            "foonly": null
+          }
+        },
+        {
+          "argv": [
+            "-foo",
+            "3"
+          ],
+          "namespace": {
+            "foo": "3",
+            "foodle": false,
+            "foonly": null
+          }
+        },
+        {
+          "argv": [
+            "-foonly",
+            "7",
+            "-foodle",
+            "-foo",
+            "2"
+          ],
+          "namespace": {
+            "foo": "2",
+            "foodle": true,
+            "foonly": "7"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--foo"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test an Optional with a double-dash option string",
+      "failures": [
+        [
+          "--foo"
+        ],
+        [
+          "-f"
+        ],
+        [
+          "-f",
+          "a"
+        ],
+        [
+          "a"
+        ],
+        [
+          "--foo",
+          "-x"
+        ],
+        [
+          "--foo",
+          "--bar"
+        ]
+      ],
+      "name": "TestOptionalsDoubleDash",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "--foo",
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "--foo=a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "--foo",
+            "-2.5"
+          ],
+          "namespace": {
+            "foo": "-2.5"
+          }
+        },
+        {
+          "argv": [
+            "--foo=-2.5"
+          ],
+          "namespace": {
+            "foo": "-2.5"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--badger"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "--bat"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Tests partial matching with a double-dash option string",
+      "failures": [
+        [
+          "--bar"
+        ],
+        [
+          "--b"
+        ],
+        [
+          "--ba"
+        ],
+        [
+          "--b=2"
+        ],
+        [
+          "--ba=4"
+        ],
+        [
+          "--badge",
+          "5"
+        ]
+      ],
+      "name": "TestOptionalsDoubleDashPartialMatch",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "badger": false,
+            "bat": null
+          }
+        },
+        {
+          "argv": [
+            "--bat",
+            "X"
+          ],
+          "namespace": {
+            "badger": false,
+            "bat": "X"
+          }
+        },
+        {
+          "argv": [
+            "--bad"
+          ],
+          "namespace": {
+            "badger": true,
+            "bat": null
+          }
+        },
+        {
+          "argv": [
+            "--badg"
+          ],
+          "namespace": {
+            "badger": true,
+            "bat": null
+          }
+        },
+        {
+          "argv": [
+            "--badge"
+          ],
+          "namespace": {
+            "badger": true,
+            "bat": null
+          }
+        },
+        {
+          "argv": [
+            "--badger"
+          ],
+          "namespace": {
+            "badger": true,
+            "bat": null
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--badger"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "--ba"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Tests when one double-dash option string is a prefix of another",
+      "failures": [
+        [
+          "--bar"
+        ],
+        [
+          "--b"
+        ],
+        [
+          "--ba"
+        ],
+        [
+          "--b=2"
+        ],
+        [
+          "--badge",
+          "5"
+        ]
+      ],
+      "name": "TestOptionalsDoubleDashPrefixMatch",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "ba": null,
+            "badger": false
+          }
+        },
+        {
+          "argv": [
+            "--ba",
+            "X"
+          ],
+          "namespace": {
+            "ba": "X",
+            "badger": false
+          }
+        },
+        {
+          "argv": [
+            "--ba=X"
+          ],
+          "namespace": {
+            "ba": "X",
+            "badger": false
+          }
+        },
+        {
+          "argv": [
+            "--bad"
+          ],
+          "namespace": {
+            "ba": null,
+            "badger": true
+          }
+        },
+        {
+          "argv": [
+            "--badg"
+          ],
+          "namespace": {
+            "ba": null,
+            "badger": true
+          }
+        },
+        {
+          "argv": [
+            "--badge"
+          ],
+          "namespace": {
+            "ba": null,
+            "badger": true
+          }
+        },
+        {
+          "argv": [
+            "--badger"
+          ],
+          "namespace": {
+            "ba": null,
+            "badger": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Tests specifying 1 arg for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-x"
+        ]
+      ],
+      "name": "TestOptionalsNargs1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a"
+          ],
+          "namespace": {
+            "x": [
+              "a"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "nargs": 3
+          }
+        }
+      ],
+      "documentation": "Tests specifying 3 args for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-x"
+        ],
+        [
+          "-x",
+          "a"
+        ],
+        [
+          "-x",
+          "a",
+          "b"
+        ],
+        [
+          "a",
+          "-x"
+        ],
+        [
+          "a",
+          "-x",
+          "b"
+        ]
+      ],
+      "name": "TestOptionalsNargs3",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "x": [
+              "a",
+              "b",
+              "c"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Tests not specifying the number of args for an Optional",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-x"
+        ]
+      ],
+      "name": "TestOptionalsNargsDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a"
+          ],
+          "namespace": {
+            "x": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        },
+        {
+          "args": [
+            "-y"
+          ],
+          "kwargs": {
+            "default": "spam",
+            "nargs": "+"
+          }
+        }
+      ],
+      "documentation": "Tests specifying args for an Optional that accepts one or more",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "-x"
+        ],
+        [
+          "-y"
+        ],
+        [
+          "a",
+          "-x"
+        ],
+        [
+          "a",
+          "-y",
+          "b"
+        ]
+      ],
+      "name": "TestOptionalsNargsOneOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a"
+          ],
+          "namespace": {
+            "x": [
+              "a"
+            ],
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "x": [
+              "a",
+              "b"
+            ],
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "a"
+          ],
+          "namespace": {
+            "x": null,
+            "y": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "x": null,
+            "y": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-w"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "const": 42,
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "-y"
+          ],
+          "kwargs": {
+            "default": "spam",
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "-z"
+          ],
+          "kwargs": {
+            "choices": [
+              1,
+              2
+            ],
+            "const": "42",
+            "default": "84",
+            "nargs": "?",
+            "type": "int"
+          }
+        }
+      ],
+      "documentation": "Tests specifying an Optional arg for an Optional",
+      "failures": [
+        [
+          "2"
+        ],
+        [
+          "-z",
+          "a"
+        ],
+        [
+          "-z",
+          "42"
+        ],
+        [
+          "-z",
+          "84"
+        ]
+      ],
+      "name": "TestOptionalsNargsOptional",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "w": null,
+            "x": null,
+            "y": "spam",
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-w"
+          ],
+          "namespace": {
+            "w": null,
+            "x": null,
+            "y": "spam",
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-w",
+            "2"
+          ],
+          "namespace": {
+            "w": "2",
+            "x": null,
+            "y": "spam",
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-x"
+          ],
+          "namespace": {
+            "w": null,
+            "x": 42,
+            "y": "spam",
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "2"
+          ],
+          "namespace": {
+            "w": null,
+            "x": "2",
+            "y": "spam",
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-y"
+          ],
+          "namespace": {
+            "w": null,
+            "x": null,
+            "y": null,
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "2"
+          ],
+          "namespace": {
+            "w": null,
+            "x": null,
+            "y": "2",
+            "z": 84
+          }
+        },
+        {
+          "argv": [
+            "-z"
+          ],
+          "namespace": {
+            "w": null,
+            "x": null,
+            "y": "spam",
+            "z": 42
+          }
+        },
+        {
+          "argv": [
+            "-z",
+            "2"
+          ],
+          "namespace": {
+            "w": null,
+            "x": null,
+            "y": "spam",
+            "z": 2
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "-y"
+          ],
+          "kwargs": {
+            "default": "spam",
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Tests specifying args for an Optional that accepts zero or more",
+      "failures": [
+        [
+          "a"
+        ]
+      ],
+      "name": "TestOptionalsNargsZeroOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-x"
+          ],
+          "namespace": {
+            "x": [],
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a"
+          ],
+          "namespace": {
+            "x": [
+              "a"
+            ],
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "x": [
+              "a",
+              "b"
+            ],
+            "y": "spam"
+          }
+        },
+        {
+          "argv": [
+            "-y"
+          ],
+          "namespace": {
+            "x": null,
+            "y": []
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "a"
+          ],
+          "namespace": {
+            "x": null,
+            "y": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "-y",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "x": null,
+            "y": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-1"
+          ],
+          "kwargs": {
+            "dest": "one"
+          }
+        }
+      ],
+      "documentation": "Test an Optional with a short opt string",
+      "failures": [
+        [
+          "-1"
+        ],
+        [
+          "a"
+        ],
+        [
+          "-1",
+          "--foo"
+        ],
+        [
+          "-1",
+          "-y"
+        ],
+        [
+          "-1",
+          "-1"
+        ],
+        [
+          "-1",
+          "-2"
+        ]
+      ],
+      "name": "TestOptionalsNumeric",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "one": null
+          }
+        },
+        {
+          "argv": [
+            "-1",
+            "a"
+          ],
+          "namespace": {
+            "one": "a"
+          }
+        },
+        {
+          "argv": [
+            "-1a"
+          ],
+          "namespace": {
+            "one": "a"
+          }
+        },
+        {
+          "argv": [
+            "-1-2"
+          ],
+          "namespace": {
+            "one": "-2"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "x"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "-4"
+          ],
+          "kwargs": {
+            "action": "store_true",
+            "dest": "y"
+          }
+        }
+      ],
+      "documentation": "Tests negative number args when numeric options are present",
+      "failures": [
+        [
+          "-2"
+        ],
+        [
+          "-315"
+        ]
+      ],
+      "name": "TestOptionalsNumericAndPositionals",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": false
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "x": "a",
+            "y": false
+          }
+        },
+        {
+          "argv": [
+            "-4"
+          ],
+          "namespace": {
+            "x": null,
+            "y": true
+          }
+        },
+        {
+          "argv": [
+            "-4",
+            "a"
+          ],
+          "namespace": {
+            "x": "a",
+            "y": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "required": true,
+            "type": "int"
+          }
+        }
+      ],
+      "documentation": "Tests an optional action that is required",
+      "failures": [
+        [
+          "a"
+        ],
+        []
+      ],
+      "name": "TestOptionalsRequired",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "-x",
+            "1"
+          ],
+          "namespace": {
+            "x": 1
+          }
+        },
+        {
+          "argv": [
+            "-x42"
+          ],
+          "namespace": {
+            "x": 42
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-v",
+            "--verbose",
+            "-n",
+            "--noisy"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        }
+      ],
+      "documentation": "Test a combination of single- and double-dash option strings",
+      "failures": [
+        [
+          "--x",
+          "--verbose"
+        ],
+        [
+          "-N"
+        ],
+        [
+          "a"
+        ],
+        [
+          "-v",
+          "x"
+        ]
+      ],
+      "name": "TestOptionalsShortLong",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "verbose": false
+          }
+        },
+        {
+          "argv": [
+            "-v"
+          ],
+          "namespace": {
+            "verbose": true
+          }
+        },
+        {
+          "argv": [
+            "--verbose"
+          ],
+          "namespace": {
+            "verbose": true
+          }
+        },
+        {
+          "argv": [
+            "-n"
+          ],
+          "namespace": {
+            "verbose": true
+          }
+        },
+        {
+          "argv": [
+            "--noisy"
+          ],
+          "namespace": {
+            "verbose": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test an Optional with a single-dash option string",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "a"
+        ],
+        [
+          "--foo"
+        ],
+        [
+          "-x",
+          "--foo"
+        ],
+        [
+          "-x",
+          "-y"
+        ]
+      ],
+      "name": "TestOptionalsSingleDash",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "a"
+          ],
+          "namespace": {
+            "x": "a"
+          }
+        },
+        {
+          "argv": [
+            "-xa"
+          ],
+          "namespace": {
+            "x": "a"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "-1"
+          ],
+          "namespace": {
+            "x": "-1"
+          }
+        },
+        {
+          "argv": [
+            "-x-1"
+          ],
+          "namespace": {
+            "x": "-1"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-foobar"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-foorab"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test Optionals that partially match but are not subsets",
+      "failures": [
+        [
+          "-f"
+        ],
+        [
+          "-f",
+          "a"
+        ],
+        [
+          "-fa"
+        ],
+        [
+          "-foa"
+        ],
+        [
+          "-foo"
+        ],
+        [
+          "-fo"
+        ],
+        [
+          "-foo",
+          "b"
+        ],
+        [
+          "-f=a"
+        ],
+        [
+          "-foo=b"
+        ]
+      ],
+      "name": "TestOptionalsSingleDashAmbiguous",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foobar": null,
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foob",
+            "a"
+          ],
+          "namespace": {
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foob=a"
+          ],
+          "namespace": {
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foor",
+            "a"
+          ],
+          "namespace": {
+            "foobar": null,
+            "foorab": "a"
+          }
+        },
+        {
+          "argv": [
+            "-foor=a"
+          ],
+          "namespace": {
+            "foobar": null,
+            "foorab": "a"
+          }
+        },
+        {
+          "argv": [
+            "-fooba",
+            "a"
+          ],
+          "namespace": {
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-fooba=a"
+          ],
+          "namespace": {
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foora",
+            "a"
+          ],
+          "namespace": {
+            "foobar": null,
+            "foorab": "a"
+          }
+        },
+        {
+          "argv": [
+            "-foora=a"
+          ],
+          "namespace": {
+            "foobar": null,
+            "foorab": "a"
+          }
+        },
+        {
+          "argv": [
+            "-foobar",
+            "a"
+          ],
+          "namespace": {
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foobar=a"
+          ],
+          "namespace": {
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foorab",
+            "a"
+          ],
+          "namespace": {
+            "foobar": null,
+            "foorab": "a"
+          }
+        },
+        {
+          "argv": [
+            "-foorab=a"
+          ],
+          "namespace": {
+            "foobar": null,
+            "foorab": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "-yyy"
+          ],
+          "kwargs": {
+            "action": "store_const",
+            "const": 42
+          }
+        },
+        {
+          "args": [
+            "-z"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test an Optional with a single-dash option string",
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "--foo"
+        ],
+        [
+          "-xa"
+        ],
+        [
+          "-x",
+          "--foo"
+        ],
+        [
+          "-x",
+          "-z"
+        ],
+        [
+          "-z",
+          "-x"
+        ],
+        [
+          "-yx"
+        ],
+        [
+          "-yz",
+          "a"
+        ],
+        [
+          "-yyyx"
+        ],
+        [
+          "-yyyza"
+        ],
+        [
+          "-xyza"
+        ],
+        [
+          "-x="
+        ]
+      ],
+      "name": "TestOptionalsSingleDashCombined",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": false,
+            "yyy": null,
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "-x"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": null,
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "-za"
+          ],
+          "namespace": {
+            "x": false,
+            "yyy": null,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-z",
+            "a"
+          ],
+          "namespace": {
+            "x": false,
+            "yyy": null,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-xza"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": null,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-xz",
+            "a"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": null,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "-za"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": null,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "-z",
+            "a"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": null,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-y"
+          ],
+          "namespace": {
+            "x": false,
+            "yyy": 42,
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "-yyy"
+          ],
+          "namespace": {
+            "x": false,
+            "yyy": 42,
+            "z": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "-yyy",
+            "-za"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": 42,
+            "z": "a"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "-yyy",
+            "-z",
+            "a"
+          ],
+          "namespace": {
+            "x": true,
+            "yyy": 42,
+            "z": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-foo"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test an Optional with a multi-character single-dash option string",
+      "failures": [
+        [
+          "-foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "--foo"
+        ],
+        [
+          "-foo",
+          "--foo"
+        ],
+        [
+          "-foo",
+          "-y"
+        ],
+        [
+          "-fooa"
+        ]
+      ],
+      "name": "TestOptionalsSingleDashLong",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "-foo",
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "-foo",
+            "-1"
+          ],
+          "namespace": {
+            "foo": "-1"
+          }
+        },
+        {
+          "argv": [
+            "-fo",
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "-f",
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-f"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-foobar"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-foorab"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test Optionals where option strings are subsets of each other",
+      "failures": [
+        [
+          "-f"
+        ],
+        [
+          "-foo"
+        ],
+        [
+          "-fo"
+        ],
+        [
+          "-foo",
+          "b"
+        ],
+        [
+          "-foob"
+        ],
+        [
+          "-fooba"
+        ],
+        [
+          "-foora"
+        ]
+      ],
+      "name": "TestOptionalsSingleDashSubsetAmbiguous",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "f": null,
+            "foobar": null,
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-f",
+            "a"
+          ],
+          "namespace": {
+            "f": "a",
+            "foobar": null,
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-fa"
+          ],
+          "namespace": {
+            "f": "a",
+            "foobar": null,
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foa"
+          ],
+          "namespace": {
+            "f": "oa",
+            "foobar": null,
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-fooa"
+          ],
+          "namespace": {
+            "f": "ooa",
+            "foobar": null,
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foobar",
+            "a"
+          ],
+          "namespace": {
+            "f": null,
+            "foobar": "a",
+            "foorab": null
+          }
+        },
+        {
+          "argv": [
+            "-foorab",
+            "a"
+          ],
+          "namespace": {
+            "f": null,
+            "foobar": null,
+            "foorab": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-f"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        },
+        {
+          "args": [
+            "--bar"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "-baz"
+          ],
+          "kwargs": {
+            "action": "store_const",
+            "const": 42
+          }
+        }
+      ],
+      "documentation": "Test an Optional with single- and double-dash option strings",
+      "failures": [
+        [
+          "--bar"
+        ],
+        [
+          "-fbar"
+        ],
+        [
+          "-fbaz"
+        ],
+        [
+          "-bazf"
+        ],
+        [
+          "-b",
+          "B"
+        ],
+        [
+          "B"
+        ]
+      ],
+      "name": "TestOptionalsSingleDoubleDash",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "bar": null,
+            "baz": null,
+            "f": false
+          }
+        },
+        {
+          "argv": [
+            "-f"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": null,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "--ba",
+            "B"
+          ],
+          "namespace": {
+            "bar": "B",
+            "baz": null,
+            "f": false
+          }
+        },
+        {
+          "argv": [
+            "-f",
+            "--bar",
+            "B"
+          ],
+          "namespace": {
+            "bar": "B",
+            "baz": null,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "-f",
+            "-b"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": 42,
+            "f": true
+          }
+        },
+        {
+          "argv": [
+            "-ba",
+            "-f"
+          ],
+          "namespace": {
+            "bar": null,
+            "baz": 42,
+            "f": true
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "--version"
+          ],
+          "kwargs": {
+            "action": "version",
+            "version": "1.0"
+          }
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "--baz"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        }
+      ],
+      "documentation": "Test actions with a parser-level default of 42",
+      "failures": [
+        [
+          "-x"
+        ]
+      ],
+      "name": "TestParserDefault42",
+      "parser": {
+        "argument_default": 42
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "bar": 42,
+            "baz": 42,
+            "foo": 42,
+            "version": 42
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": 42,
+            "baz": 42,
+            "foo": "a",
+            "version": 42
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": 42,
+            "foo": "a",
+            "version": 42
+          }
+        },
+        {
+          "argv": [
+            "--baz"
+          ],
+          "namespace": {
+            "bar": 42,
+            "baz": true,
+            "foo": 42,
+            "version": 42
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "--baz"
+          ],
+          "namespace": {
+            "bar": 42,
+            "baz": true,
+            "foo": "a",
+            "version": 42
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": true,
+            "foo": "a",
+            "version": 42
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "--baz"
+          ],
+          "kwargs": {
+            "action": "store_true"
+          }
+        }
+      ],
+      "documentation": "Test actions with a parser-level default of SUPPRESS",
+      "failures": [
+        [
+          "-x"
+        ]
+      ],
+      "name": "TestParserDefaultSuppress",
+      "parser": {
+        "argument_default": {
+          "__suppress__": true
+        }
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {}
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "--baz"
+          ],
+          "namespace": {
+            "baz": true
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "--baz"
+          ],
+          "namespace": {
+            "baz": true,
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "--baz",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": true,
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "action": "append"
+          }
+        },
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "action": "append",
+            "nargs": 2
+          }
+        }
+      ],
+      "documentation": "Test the 'append' action",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      ],
+      "name": "TestPositionalsActionAppend",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "spam": [
+              "a",
+              [
+                "b",
+                "c"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "action": "extend"
+          }
+        },
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "action": "extend",
+            "nargs": 2
+          }
+        }
+      ],
+      "documentation": "Test the 'extend' action",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      ],
+      "name": "TestPositionalsActionExtend",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "spam": [
+              "a",
+              "b",
+              "c"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "choices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "type": "int"
+          }
+        }
+      ],
+      "documentation": "Test a set of integer choices",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "h"
+        ],
+        [
+          "42"
+        ],
+        [
+          "ef"
+        ]
+      ],
+      "name": "TestPositionalsChoicesInt",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "4"
+          ],
+          "namespace": {
+            "spam": 4
+          }
+        },
+        {
+          "argv": [
+            "15"
+          ],
+          "namespace": {
+            "spam": 15
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "choices": [
+              "c",
+              "a",
+              "e",
+              "f",
+              "d",
+              "g",
+              "b"
+            ]
+          }
+        }
+      ],
+      "documentation": "Test a set of single-character choices",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "h"
+        ],
+        [
+          "42"
+        ],
+        [
+          "ef"
+        ]
+      ],
+      "name": "TestPositionalsChoicesString",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "spam": "a"
+          }
+        },
+        {
+          "argv": [
+            "g"
+          ],
+          "namespace": {
+            "spam": "g"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test a Positional that specifies an nargs of 1",
+      "failures": [
+        [],
+        [
+          "-x"
+        ],
+        [
+          "a",
+          "b"
+        ]
+      ],
+      "name": "TestPositionalsNargs1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": [
+              "a"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": 2
+          }
+        }
+      ],
+      "documentation": "Test a Positional that specifies an nargs of 2",
+      "failures": [
+        [],
+        [
+          "a"
+        ],
+        [
+          "-x"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargs2",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": 2
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test a Positional with 2 nargs followed by one with none",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      ],
+      "name": "TestPositionalsNargs2None",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": 2
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        }
+      ],
+      "documentation": "Test a Positional with 2 nargs followed by one with one or more",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b"
+        ]
+      ],
+      "name": "TestPositionalsNargs2OneOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "c"
+            ],
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": 2
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        }
+      ],
+      "documentation": "Test a Positional with 2 nargs followed by one optional",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      ],
+      "name": "TestPositionalsNargs2Optional",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": null,
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": 2
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Test a Positional with 2 nargs followed by one with unlimited",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ]
+      ],
+      "name": "TestPositionalsNargs2ZeroOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [],
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "c"
+            ],
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test a Positional that doesn't specify nargs",
+      "failures": [
+        [],
+        [
+          "-x"
+        ],
+        [
+          "a",
+          "b"
+        ]
+      ],
+      "name": "TestPositionalsNargsNone",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test a Positional with no nargs followed by one with 1",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNone1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test two Positionals that don't specify nargs",
+      "failures": [
+        [],
+        [
+          "-x"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneNone",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        }
+      ],
+      "documentation": "Test a Positional with no nargs followed by one with one or more",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneOneOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        },
+        {
+          "args": [
+            "baz"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test three Positionals: no nargs, one or more nargs and 1 nargs",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "b"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c",
+          "d"
+        ],
+        [
+          "a",
+          "b",
+          "c",
+          "-x",
+          "X",
+          "d"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneOneOrMore1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "baz": [
+              "d"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "baz": [
+              "d"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b",
+            "c",
+            "d"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "baz": [
+              "d"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "baz": [
+              "d"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        }
+      ],
+      "documentation": "Test a Positional with no nargs followed by one with an Optional",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneOptional",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": null,
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a"
+          ],
+          "namespace": {
+            "bar": null,
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": null,
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a",
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "default": 0.625,
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "baz"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test three Positionals: no nargs, optional narg and 1 nargs",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneOptional1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": 0.625,
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "b",
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": 0.625,
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b"
+          ],
+          "namespace": {
+            "bar": 0.625,
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": 0.625,
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "b",
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "b",
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "b",
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Test a Positional with no nargs followed by one with unlimited",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneZeroOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": [],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a"
+          ],
+          "namespace": {
+            "bar": [],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "baz"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test three Positionals: no nargs, unlimited nargs and 1 nargs",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsNoneZeroOrMore1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [],
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [],
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b"
+          ],
+          "namespace": {
+            "bar": [],
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [],
+            "baz": [
+              "b"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "baz": [
+              "c"
+            ],
+            "foo": "a",
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        }
+      ],
+      "documentation": "Test a Positional that specifies one or more nargs",
+      "failures": [
+        [],
+        [
+          "-x"
+        ]
+      ],
+      "name": "TestPositionalsNargsOneOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test a Positional with one or more nargs followed by one with 1",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ]
+      ],
+      "name": "TestPositionalsNargsOneOrMore1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "c"
+            ],
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test a Positional with one or more nargs followed by one with none",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a"
+        ],
+        [
+          "a",
+          "-x",
+          "X",
+          "b",
+          "c"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsOneOrMoreNone",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ],
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ],
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        }
+      ],
+      "documentation": "Tests an Optional Positional",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "a",
+          "b"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptional",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test a Positional with an Optional nargs followed by one with 1",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptional1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": [
+              "a"
+            ],
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "choices": [
+              1,
+              2
+            ],
+            "default": "42",
+            "nargs": "?",
+            "type": "int"
+          }
+        }
+      ],
+      "documentation": "Tests an Optional Positional with a default value\nthat needs to be converted to the appropriate type.",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "1",
+          "2"
+        ],
+        [
+          "42"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptionalConvertedDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": 42
+          }
+        },
+        {
+          "argv": [
+            "1"
+          ],
+          "namespace": {
+            "foo": 1
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "choices": [
+              "a",
+              "b"
+            ],
+            "default": 42,
+            "nargs": "?"
+          }
+        }
+      ],
+      "documentation": "Tests an Optional Positional with a default value",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "a",
+          "b"
+        ],
+        [
+          "42"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptionalDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": 42
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "default": 42,
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test a Positional with an Optional nargs followed by one with none",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptionalNone",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": "a",
+            "foo": 42
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "+"
+          }
+        }
+      ],
+      "documentation": "Test an Optional narg followed by one or more nargs",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptionalOneOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": [
+              "a"
+            ],
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "default": 42,
+            "nargs": "?"
+          }
+        }
+      ],
+      "documentation": "Test two optional nargs",
+      "failures": [
+        [
+          "--foo"
+        ],
+        [
+          "a",
+          "b",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptionalOptional",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "bar": 42,
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": 42,
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Test an Optional narg followed by unlimited nargs",
+      "failures": [
+        [
+          "--foo"
+        ]
+      ],
+      "name": "TestPositionalsNargsOptionalZeroOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "bar": [],
+            "foo": null
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": [],
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": "a"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "b",
+              "c"
+            ],
+            "foo": "a"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Test a Positional that specifies unlimited nargs",
+      "failures": [
+        [
+          "-x"
+        ]
+      ],
+      "name": "TestPositionalsNargsZeroOrMore",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": []
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {
+            "nargs": 1
+          }
+        }
+      ],
+      "documentation": "Test a Positional with unlimited nargs followed by one with 1",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ]
+      ],
+      "name": "TestPositionalsNargsZeroOrMore1",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": [
+              "a"
+            ],
+            "foo": []
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": [
+              "b"
+            ],
+            "foo": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": [
+              "c"
+            ],
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "choices": [
+              "a",
+              "b"
+            ],
+            "default": "bar",
+            "nargs": "*"
+          }
+        }
+      ],
+      "documentation": "Test a Positional that specifies unlimited nargs and a default",
+      "failures": [
+        [
+          "-x"
+        ],
+        [
+          "bar"
+        ],
+        [
+          "a",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsZeroOrMoreDefault",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "foo": "bar"
+          }
+        },
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "foo": [
+              "a"
+            ]
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "foo": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-x"
+          ],
+          "kwargs": {}
+        },
+        {
+          "args": [
+            "foo"
+          ],
+          "kwargs": {
+            "nargs": "*"
+          }
+        },
+        {
+          "args": [
+            "bar"
+          ],
+          "kwargs": {}
+        }
+      ],
+      "documentation": "Test a Positional with unlimited nargs followed by one with none",
+      "failures": [
+        [],
+        [
+          "--foo"
+        ],
+        [
+          "a",
+          "-x",
+          "X",
+          "b"
+        ],
+        [
+          "a",
+          "-x",
+          "X",
+          "b",
+          "c"
+        ],
+        [
+          "a",
+          "b",
+          "-x",
+          "X",
+          "c"
+        ]
+      ],
+      "name": "TestPositionalsNargsZeroOrMoreNone",
+      "parser": {},
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "a"
+          ],
+          "namespace": {
+            "bar": "a",
+            "foo": [],
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ],
+            "x": null
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a"
+          ],
+          "namespace": {
+            "bar": "a",
+            "foo": [],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "a",
+            "foo": [],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "b",
+            "foo": [
+              "a"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "-x",
+            "X",
+            "a",
+            "b",
+            "c"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ],
+            "x": "X"
+          }
+        },
+        {
+          "argv": [
+            "a",
+            "b",
+            "c",
+            "-x",
+            "X"
+          ],
+          "namespace": {
+            "bar": "c",
+            "foo": [
+              "a",
+              "b"
+            ],
+            "x": "X"
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [
+        {
+          "args": [
+            "-"
+          ],
+          "kwargs": {
+            "const": "badger",
+            "dest": "x",
+            "nargs": "?"
+          }
+        },
+        {
+          "args": [
+            "+"
+          ],
+          "kwargs": {
+            "default": 42,
+            "dest": "y",
+            "type": "int"
+          }
+        },
+        {
+          "args": [
+            "-+-"
+          ],
+          "kwargs": {
+            "action": "store_true",
+            "dest": "z"
+          }
+        }
+      ],
+      "documentation": "",
+      "failures": [
+        [
+          "-y"
+        ],
+        [
+          "+",
+          "-"
+        ]
+      ],
+      "name": "TestPrefixCharacterOnlyArguments",
+      "parser": {
+        "prefix_chars": "-+"
+      },
+      "skip": null,
+      "successes": [
+        {
+          "argv": [],
+          "namespace": {
+            "x": null,
+            "y": 42,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "-"
+          ],
+          "namespace": {
+            "x": "badger",
+            "y": 42,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "-",
+            "X"
+          ],
+          "namespace": {
+            "x": "X",
+            "y": 42,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "+",
+            "-3"
+          ],
+          "namespace": {
+            "x": null,
+            "y": -3,
+            "z": false
+          }
+        },
+        {
+          "argv": [
+            "-+-"
+          ],
+          "namespace": {
+            "x": null,
+            "y": 42,
+            "z": true
+          }
+        },
+        {
+          "argv": [
+            "-",
+            "==="
+          ],
+          "namespace": {
+            "x": "===",
+            "y": 42,
+            "z": false
+          }
+        }
+      ]
+    },
+    {
+      "arguments": [],
+      "documentation": "Test some callables as option/argument types",
+      "failures": [],
+      "name": "TestTypeCallable",
+      "parser": {},
+      "skip": "type 'complex'",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test a classic class type",
+      "failures": [],
+      "name": "TestTypeClassicClass",
+      "parser": {},
+      "skip": "type 'C'",
+      "successes": []
+    },
+    {
+      "arguments": [],
+      "documentation": "Test a user-defined option/argument type",
+      "failures": [],
+      "name": "TestTypeUserDefined",
+      "parser": {},
+      "skip": "type 'MyType'",
+      "successes": []
+    }
+  ],
+  "extracted_with": "Python 3.14.7",
+  "source": "https://raw.githubusercontent.com/python/cpython/v3.14.0/Lib/test/test_argparse.py"
+}
