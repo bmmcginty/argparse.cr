@@ -1,52 +1,204 @@
-# A small, dependency-free command line parser modelled after Python's argparse.
+# A command line parser modelled after Python's `argparse` module.
+#
+# The parsing algorithm follows CPython's `argparse`: argv is classified into a
+# pattern of option ("O") and argument ("A") characters, and `nargs` values are
+# matched against that pattern.  Following CPython's algorithm (instead of
+# rediscovering it) keeps edge cases such as `-x-1`, `-3.5`, abbreviated long
+# options and interleaved positionals behaving the way they do in Python.
 module Argparse
-  VERSION = "0.1.0"
+  VERSION = "0.2.0"
 
-  alias Scalar = String | Int64 | Float64 | Bool
-  alias Value = Scalar | Array(Scalar) | Nil
+  # A value that can be stored in a {Namespace}.  The alias is recursive
+  # because `nargs` may nest values, e.g. `append` combined with `nargs: "*"`.
+  alias Value = String | Int64 | Float64 | Bool | Array(Value) | Nil
+
+  # Placeholder for "the caller did not supply this keyword argument".
+  class Unset
+    def inspect(io : IO) : Nil
+      io << "UNSET"
+    end
+
+    def to_s(io : IO) : Nil
+      inspect(io)
+    end
+  end
+
+  UNSET = Unset.new
+
+  # Placeholder matching `argparse.SUPPRESS`: an argument with this default
+  # simply does not appear in the resulting namespace.
+  class Suppress
+    def inspect(io : IO) : Nil
+      io << "SUPPRESS"
+    end
+
+    def to_s(io : IO) : Nil
+      inspect(io)
+    end
+  end
+
+  SUPPRESS = Suppress.new
+
+  # Values accepted by `const:`, `default:` and `argument_default:`.
+  alias Spec = Value | Unset | Suppress
+
+  # Normalises a value supplied through the public API into a {Spec}.
+  def self.normalize(value : Object?) : Spec
+    case value
+    when Unset    then UNSET
+    when Suppress then SUPPRESS
+    else               normalize_value(value)
+    end
+  end
+
+  # Normalises a single value, recursively converting containers.
+  def self.normalize_value(value : Object?) : Value
+    case value
+    when Nil                           then nil
+    when Bool                          then value
+    when String                        then value
+    when Symbol                        then value.to_s
+    when Int8, Int16, Int32, Int64     then value.to_i64
+    when UInt8, UInt16, UInt32, UInt64 then value.to_i64
+    when Float32                       then value.to_f64
+    when Float64                       then value
+    when Enum                          then value.to_s
+    when Array
+      result = Array(Value).new
+      value.each { |item| result << normalize_value(item) }
+      result
+    when Tuple
+      result = Array(Value).new
+      value.each { |item| result << normalize_value(item) }
+      result
+    when Set
+      result = Array(Value).new
+      value.each { |item| result << normalize_value(item) }
+      result
+    else
+      raise ConfigurationError.new("unsupported value: #{value.inspect}")
+    end
+  end
+
+  # Normalises a `choices:` argument into a list of values.
+  def self.normalize_choices(value : Object?) : Array(Value)?
+    return nil if value.nil?
+    case value
+    when Array, Tuple, Set
+      result = Array(Value).new
+      value.each { |item| result << normalize_value(item) }
+      result
+    else
+      raise ConfigurationError.new("choices must be a list, not #{value.class}")
+    end
+  end
 
   class Error < Exception
   end
 
-  class ArgumentError < Error
+  # Raised for programmer errors such as an unusable `nargs`, mirroring the
+  # `ValueError`s raised by CPython's `add_argument`.
+  class ConfigurationError < Error
   end
 
+  # Raised while parsing.  When an argument is involved its invocation is
+  # prefixed, exactly like CPython's `argparse.ArgumentError`.
+  class ArgumentError < Error
+    getter argument_name : String?
+    getter detail : String
+
+    def initialize(@detail : String, @argument_name : String? = nil)
+      super(@argument_name ? "argument #{@argument_name}: #{@detail}" : @detail)
+    end
+  end
+
+  # Renders a value the way Python's `repr` would, so error messages match.
+  def self.py_repr(value : Value) : String
+    case value
+    when String
+      quote = value.includes?('\'') && !value.includes?('"') ? '"' : '\''
+      escaped = String.build do |io|
+        value.each_char do |character|
+          case character
+          when '\'' then io << "\\'" if quote == '\''
+          when '"'  then io << "\\\"" if quote == '"'
+          when '\\' then io << "\\\\"
+          when '\n' then io << "\\n"
+          when '\r' then io << "\\r"
+          when '\t' then io << "\\t"
+          else           io << character
+          end
+        end
+      end
+      "#{quote}#{escaped}#{quote}"
+    when Nil   then "None"
+    when true  then "True"
+    when false then "False"
+    when Array(Value)
+      "[#{value.map { |item| py_repr(item) }.join(", ")}]"
+    else
+      value.to_s
+    end
+  end
+
+  # Renders a value the way Python's `str` would.
+  def self.py_str(value : Value) : String
+    case value
+    when String then value
+    else             py_repr(value)
+    end
+  end
+
+  # The result of a successful parse.
   class Namespace
     getter values : Hash(String, Value)
 
     def initialize(@values = {} of String => Value)
     end
 
-    def [](name : String | Symbol) : Value
-      @values[name.to_s]?
+    def [](key : String | Symbol) : Value
+      @values[key.to_s]
     end
 
-    def []?(name : String | Symbol) : Value
-      self[name]
+    def []?(key : String | Symbol) : Value
+      @values[key.to_s]?
     end
 
-    def has_key?(name : String | Symbol) : Bool
-      @values.has_key?(name.to_s)
+    def []=(key : String | Symbol, value : Value) : Value
+      @values[key.to_s] = value
     end
 
-    def string(name : String | Symbol) : String?
-      case value = self[name]
-      when String               then value
-      when Int64, Float64, Bool then value.to_s
-      else                           nil
+    def has_key?(key : String | Symbol) : Bool
+      @values.has_key?(key.to_s)
+    end
+
+    def keys : Array(String)
+      @values.keys
+    end
+
+    def to_h : Hash(String, Value)
+      @values.dup
+    end
+
+    def ==(other : Namespace) : Bool
+      @values == other.values
+    end
+
+    def string(key : String | Symbol) : String?
+      @values[key.to_s]?.as?(String)
+    end
+
+    def int(key : String | Symbol) : Int64?
+      case value = @values[key.to_s]?
+      when Int64   then value
+      when Float64 then value.to_i64 if value == value.trunc
+      when String  then value.to_i64?
+      else              nil
       end
     end
 
-    def int(name : String | Symbol) : Int64?
-      case value = self[name]
-      when Int64  then value
-      when String then value.to_i64?
-      else             nil
-      end
-    end
-
-    def float(name : String | Symbol) : Float64?
-      case value = self[name]
+    def float(key : String | Symbol) : Float64?
+      case value = @values[key.to_s]?
       when Float64 then value
       when Int64   then value.to_f64
       when String  then value.to_f64?
@@ -54,193 +206,427 @@ module Argparse
       end
     end
 
-    def bool(name : String | Symbol) : Bool?
-      value = self[name]
-      value.as?(Bool)
+    def bool(key : String | Symbol) : Bool?
+      @values[key.to_s]?.as?(Bool)
     end
 
-    def array(name : String | Symbol) : Array(Scalar)?
-      self[name].as?(Array(Scalar))
-    end
-
-    def to_h : Hash(String, Value)
-      @values.dup
+    def array(key : String | Symbol) : Array(Value)?
+      @values[key.to_s]?.as?(Array(Value))
     end
 
     def to_s(io : IO) : Nil
       io << "Namespace("
       @values.each_with_index do |(key, value), index|
-        io << ", " unless index == 0
+        io << ", " unless index.zero?
         io << key << '=' << value.inspect
       end
       io << ')'
     end
+
+    def inspect(io : IO) : Nil
+      to_s(io)
+    end
   end
 
+  # One command line argument: either an optional (`-x`, `--foo`) or a
+  # positional.
   class Argument
-    getter names : Array(String)
+    getter option_strings : Array(String)
     getter dest : String
     getter action : String
-    getter nargs : String | Int32 | Nil
-    getter const_value : Value
-    getter default_value : Value
+    getter nargs : Nil | Int32 | String
+    getter const : Spec
+    property default : Spec
     getter type_name : String?
-    getter choices : Array(String)?
+    getter choices : Array(Value)?
     getter required : Bool
-    getter help : String?
+    getter help : String? | Suppress
     getter metavar : String?
-    getter option : Bool
-    getter positional_index : Int32
+    getter version : String?
+    getter converter : Proc(String, Value)?
 
-    def initialize(@names : Array(String), @dest : String, @action : String,
-                   @nargs : String | Int32 | Nil, @const_value : Value,
-                   @default_value : Value, @type_name : String?,
-                   @choices : Array(String)?, @required : Bool, @help : String?,
-                   @metavar : String?, @option : Bool, @positional_index : Int32,
-                   @converter : Proc(String, Scalar)? = nil)
+    def initialize(@option_strings : Array(String), @dest : String,
+                   @action : String, @nargs : Nil | Int32 | String,
+                   @const : Spec, @default : Spec, @type_name : String?,
+                   @choices : Array(Value)?, @required : Bool,
+                   @help : String? | Suppress, @metavar : String?,
+                   @version : String?,
+                   @converter : Proc(String, Value)? = nil)
     end
 
-    def convert(value : String) : Scalar
-      if converter = @converter
-        return converter.call(value)
+    # True for `-x`/`--foo` style arguments.
+    def option? : Bool
+      !@option_strings.empty?
+    end
+
+    # The name used in error messages, mirroring `argparse._get_action_name`.
+    def name : String
+      return @option_strings.join('/') if option?
+      @metavar || @dest
+    end
+
+    # Converts one command line word to a value.
+    def convert(text : String) : Value
+      if custom = @converter
+        begin
+          return custom.call(text)
+        rescue ex : ArgumentError
+          raise ex
+        rescue ex
+          raise ArgumentError.new(ex.message || "invalid value: #{Argparse.py_repr(text)}", name)
+        end
       end
       case @type_name
-      when nil, "str", "string"
-        value
-      when "int", "integer"
-        value.to_i64
-      when "float"
-        value.to_f64
-      when "bool", "boolean"
-        case value.downcase
-        when "1", "true", "yes", "on"  then true
-        when "0", "false", "no", "off" then false
-        else                                raise ArgumentError.new("invalid boolean value: #{value.inspect}")
+      when nil, "str", "string", "String"
+        text
+      when "int", "integer", "Int32", "Int64"
+        begin
+          Argument.parse_int(text)
+        rescue ex
+          raise ArgumentError.new("invalid int value: #{Argparse.py_repr(text)}", name)
+        end
+      when "float", "Float64"
+        begin
+          Argument.parse_float(text)
+        rescue ex
+          raise ArgumentError.new("invalid float value: #{Argparse.py_repr(text)}", name)
         end
       else
-        raise ArgumentError.new("unknown argument type #{@type_name.inspect}")
+        raise ConfigurationError.new("unknown argument type #{@type_name.inspect}")
       end
-    rescue ex : ArgumentError
-      raise ex
-    rescue
-      label = @type_name || "value"
-      raise ArgumentError.new("invalid #{label} value: #{value.inspect}")
     end
 
-    def display_name : String
-      @option ? @names.join("/") : (@metavar || @dest.upcase)
+    # Integer parsing accepting what Python's `int()` accepts.
+    def self.parse_int(text : String) : Int64
+      trimmed = text.strip
+      unless trimmed.matches?(/\A[+-]?(?:\d(?:_?\d)*)\z/)
+        raise ArgumentError.new("invalid int value: #{Argparse.py_repr(text)}")
+      end
+      trimmed.delete('_').to_i64
+    end
+
+    # Float parsing accepting what Python's `float()` accepts.
+    def self.parse_float(text : String) : Float64
+      trimmed = text.strip.delete('_')
+      case trimmed.downcase
+      when "inf", "+inf", "infinity", "+infinity" then Float64::INFINITY
+      when "-inf", "-infinity"                    then -Float64::INFINITY
+      when "nan", "+nan", "-nan"                  then Float64::NAN
+      when /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
+        trimmed.to_f64
+      else
+        raise ArgumentError.new("invalid float value: #{Argparse.py_repr(text)}")
+      end
     end
   end
 
+  # A group of optionals where at most one may be used.
   class MutuallyExclusiveGroup
     getter arguments = [] of Argument
 
     def initialize(@parser : ArgumentParser, @required : Bool)
     end
 
-    def add_argument(*names : String, action : String = "store",
-                     nargs : String | Int32 | Nil = nil, const : Value = nil,
-                     default : Value = nil, type : String? = nil,
-                     choices : Enumerable(String)? = nil, required : Bool = false,
-                     help : String? = nil, metavar : String? = nil,
-                     dest : String? = nil) : Argument
-      argument = @parser.add_argument(*names, action: action, nargs: nargs,
-        const: const, default: default, type: type, choices: choices,
-        required: required, help: help, metavar: metavar, dest: dest)
-      unless argument.option
-        raise ArgumentError.new("mutually exclusive arguments must be optional")
-      end
-      @arguments << argument
-      argument
-    end
-
     def required? : Bool
       @required
     end
-  end
 
-  class ArgumentParser
-    getter prog : String
-    property description : String?
-    property epilog : String?
-    property usage : String?
-    property add_help : Bool
-    property allow_abbrev : Bool
-    property exit_on_error : Bool
-
-    @arguments = [] of Argument
-    @groups = [] of MutuallyExclusiveGroup
-
-    def initialize(prog : String? = nil, @usage : String? = nil,
-                   @description : String? = nil, @epilog : String? = nil,
-                   @add_help : Bool = true, @allow_abbrev : Bool = true,
-                   @exit_on_error : Bool = true)
-      @prog = prog || File.basename(PROGRAM_NAME)
-      if @add_help
-        add_argument("-h", "--help", action: "help", help: "show this help message and exit")
-      end
+    def add_argument(*args : String, **options) : Argument
+      register(@parser.add_argument(*args, **options))
     end
 
-    def add_argument(*names : String, action : String = "store",
-                     nargs : String | Int32 | Nil = nil, const : Value = nil,
-                     default : Value = nil, type : String? = nil,
-                     choices : Enumerable(String)? = nil, required : Bool = false,
-                     help : String? = nil, metavar : String? = nil,
-                     dest : String? = nil) : Argument
-      add_argument_impl(names.to_a, action, nargs, const, default, type,
-        choices.try(&.to_a), required, help, metavar, dest, nil)
+    def add_argument(*args : String, &converter : String -> Value) : Argument
+      register(@parser.add_argument(*args, &converter))
     end
 
-    def add_argument(*names : String, action : String = "store",
-                     nargs : String | Int32 | Nil = nil, const : Value = nil,
-                     default : Value = nil, choices : Enumerable(String)? = nil,
-                     required : Bool = false, help : String? = nil,
-                     metavar : String? = nil, dest : String? = nil,
-                     &converter : String -> Scalar) : Argument
-      add_argument_impl(names.to_a, action, nargs, const, default, nil,
-        choices.try(&.to_a), required, help, metavar, dest, converter)
-    end
-
-    private def add_argument_impl(names, action, nargs, const, default, type,
-                                  choices, required, help, metavar, explicit_dest,
-                                  converter) : Argument
-      raise ArgumentError.new("add_argument requires at least one name") if names.empty?
-      option = names.any? { |name| name.starts_with?('-') }
-      if option && names.any? { |name| !name.starts_with?('-') }
-        raise ArgumentError.new("option strings and positional names cannot be mixed")
+    private def register(argument : Argument) : Argument
+      unless argument.option?
+        raise ConfigurationError.new("mutually exclusive arguments must be optional")
       end
-      names.each do |name|
-        if option && @arguments.any? { |arg| arg.names.includes?(name) }
-          raise ArgumentError.new("conflicting option string: #{name}")
-        end
-      end
-      destination = explicit_dest || infer_dest(names, option)
-      normalized_action = action.gsub('-', '_')
-      valid_actions = {"store", "store_const", "store_true", "store_false", "append", "append_const", "count", "help", "version"}
-      unless valid_actions.includes?(normalized_action)
-        raise ArgumentError.new("unknown action #{action.inspect}")
-      end
-      effective_nargs = case normalized_action
-                        when "store_const", "store_true", "store_false", "append_const", "count", "help", "version" then 0
-                        else                                                                                             nargs
-                        end
-      if effective_nargs.is_a?(Int32) && effective_nargs < 0
-        raise ArgumentError.new("nargs must be non-negative")
-      end
-      position = @arguments.count { |arg| !arg.option }
-      argument = Argument.new(names, destination, normalized_action, effective_nargs,
-        const, default, type, choices, required, help, metavar, option, position, converter)
       @arguments << argument
       argument
     end
+  end
 
-    private def infer_dest(names : Array(String), option : Bool) : String
-      source = if option
-                 names.select { |name| name.starts_with?("--") }.max_by?(&.size) || names.first
-               else
-                 names.first
-               end
-      source.lstrip('-').gsub('-', '_')
+  # Mutable state threaded through a single parse.
+  private class ParseRun
+    property namespace : Namespace
+    property positionals : Array(Argument)
+    getter extras = [] of String
+    getter seen_actions = Set(Argument).new
+    getter seen_non_default = Set(Argument).new
+
+    def initialize(@namespace : Namespace, actions : Array(Argument))
+      @positionals = actions.reject(&.option?)
+    end
+  end
+
+  # One possible interpretation of an option-looking word.
+  private record OptionTuple,
+    action : Argument?,
+    option_string : String,
+    sep : String?,
+    explicit_arg : String?
+
+  class ArgumentParser
+    getter prog : String
+    getter usage : String | Suppress | Nil
+    property description : String?
+    property epilog : String?
+    getter add_help : Bool
+    getter prefix_chars : String
+    getter allow_abbrev : Bool
+    getter argument_default : Spec
+    # Width of the formatter, like Python's `HelpFormatter` width (the
+    # terminal width minus two columns).
+    getter width : Int32
+    property exit_on_error : Bool
+
+    NEGATIVE_NUMBER = /\A-\.?\d/
+
+    @actions = [] of Argument
+    @option_string_actions = {} of String => Argument
+    @groups = [] of MutuallyExclusiveGroup
+    @has_negative_number_optionals = false
+    @parser_defaults = {} of String => Spec
+
+    def initialize(prog : String? = nil, @usage : String | Suppress | Nil = nil,
+                   @description : String? = nil, @epilog : String? = nil,
+                   @add_help : Bool = true, @prefix_chars : String = "-",
+                   @allow_abbrev : Bool = true,
+                   @argument_default : Spec = UNSET,
+                   @exit_on_error : Bool = true,
+                   @width : Int32 = 78)
+      @prog = prog || File.basename(PROGRAM_NAME)
+      if @add_help
+        prefix = @prefix_chars.includes?('-') ? '-' : @prefix_chars[0]
+        add_argument("#{prefix}h", "#{prefix}#{prefix}help", action: "help",
+          default: SUPPRESS, help: "show this help message and exit")
+      end
+    end
+
+    # ---------------------------------------------------------------
+    # Defining arguments
+    # ---------------------------------------------------------------
+
+    def add_argument(*args : String, action : String | Nil = nil,
+                     nargs : Int32 | String | Nil = nil,
+                     const : Object? = UNSET, default : Object? = UNSET,
+                     type : String | Symbol | Nil = nil,
+                     choices : Object? = nil,
+                     required : Bool | Nil = nil,
+                     help : String | Suppress | Nil = nil,
+                     metavar : String | Nil = nil,
+                     dest : String | Nil = nil,
+                     version : String | Nil = nil) : Argument
+      add_argument_impl(args.to_a, action, nargs, const, default, type,
+        choices, required, help, metavar, dest, version, nil)
+    end
+
+    def add_argument(*args : String, action : String | Nil = nil,
+                     nargs : Int32 | String | Nil = nil,
+                     const : Object? = UNSET, default : Object? = UNSET,
+                     type : String | Symbol | Nil = nil,
+                     choices : Object? = nil,
+                     required : Bool | Nil = nil,
+                     help : String | Suppress | Nil = nil,
+                     metavar : String | Nil = nil,
+                     dest : String | Nil = nil,
+                     version : String | Nil = nil,
+                     &converter : String -> Value) : Argument
+      add_argument_impl(args.to_a, action, nargs, const, default, type,
+        choices, required, help, metavar, dest, version, converter)
+    end
+
+    private def add_argument_impl(names : Array(String), action : String?,
+                                  nargs : Int32 | String | Nil,
+                                  raw_const : Object?, raw_default : Object?,
+                                  raw_type : String | Symbol | Nil,
+                                  raw_choices : Object?, required : Bool?,
+                                  help : String | Suppress | Nil,
+                                  metavar : String?, dest : String?,
+                                  version : String?,
+                                  converter : Proc(String, Value)?) : Argument
+      const = Argparse.normalize(raw_const)
+      default = Argparse.normalize(raw_default)
+      type = raw_type.is_a?(Symbol) ? raw_type.to_s : raw_type
+      choices = Argparse.normalize_choices(raw_choices)
+      raise ConfigurationError.new("add_argument requires at least one name") if names.empty?
+
+      uses_prefix = names.any? { |name| has_prefix?(name) }
+      if uses_prefix
+        unless names.all? { |name| has_prefix?(name) }
+          raise ConfigurationError.new("invalid option string #{names.find { |name| !has_prefix?(name) }.inspect}: must start with one of #{@prefix_chars.inspect}")
+        end
+        destination = dest || infer_optional_dest(names)
+        option_strings = names
+      else
+        if names.size > 1
+          raise ConfigurationError.new("positional arguments cannot be given aliases: #{names.join(", ")}")
+        end
+        raise ConfigurationError.new("dest supplied twice for positional argument") if dest
+        destination = names.first
+        option_strings = [] of String
+      end
+
+      action_name = (action || "store").gsub('-', '_')
+      action_name = "boolean_optional" if action_name == "BooleanOptionalAction"
+      unless ACTION_NAMES.includes?(action_name)
+        raise ConfigurationError.new("unknown action #{action.inspect}")
+      end
+      check_nargs(nargs)
+      check_action_kwargs(action_name, nargs, const)
+
+      if action_name == "boolean_optional"
+        expanded = [] of String
+        option_strings.each do |name|
+          if name.starts_with?("--no-")
+            raise ConfigurationError.new("invalid option name #{name.inspect} for BooleanOptionalAction")
+          end
+          expanded << name
+          expanded << "--no-#{name[2..]}" if name.starts_with?("--")
+        end
+        option_strings = expanded
+      end
+
+      effective_nargs = case action_name
+                        when "store_const", "store_true", "store_false", "append_const",
+                             "count", "help", "version", "boolean_optional"
+                          0
+                        else
+                          nargs
+                        end
+      required_flag = if required.nil?
+                        option_strings.empty? && !(nargs == "?" || nargs == "*")
+                      else
+                        required.as(Bool)
+                      end
+      if action_name == "version" && help.nil?
+        help = "show program's version number and exit"
+      end
+      resolved_default = resolve_default(action_name, default, option_strings.empty?, nargs)
+      resolved_const = case action_name
+                       when "store_true"  then true
+                       when "store_false" then false
+                       else                    const.is_a?(Unset) ? nil : const
+                       end
+
+      argument = Argument.new(option_strings, destination, action_name,
+        effective_nargs, resolved_const, resolved_default, type, choices,
+        required_flag, help, metavar, version, converter)
+      check_conflicts(argument)
+      @actions << argument
+      unless option_strings.empty?
+        option_strings.each { |name| @option_string_actions[name] = argument }
+        if option_strings.any? { |name| NEGATIVE_NUMBER.matches?(name) }
+          @has_negative_number_optionals = true
+        end
+      end
+      argument
+    end
+
+    private ACTION_NAMES = %w[store store_const store_true store_false append append_const count help
+      version extend boolean_optional]
+    private NARGS_NAMES = %w[? * + ...]
+
+    private def has_prefix?(name : String) : Bool
+      !name.empty? && @prefix_chars.includes?(name[0])
+    end
+
+    private def infer_optional_dest(names : Array(String)) : String
+      long_names = names.select { |name| name.size > 1 && @prefix_chars.includes?(name[1]) }
+      source = long_names.first? || names.first
+      inferred = source.lstrip(@prefix_chars).gsub('-', '_')
+      if inferred.empty?
+        raise ConfigurationError.new("dest= is required for options like #{source.inspect}")
+      end
+      inferred
+    end
+
+    private def check_nargs(nargs : Int32 | String | Nil) : Nil
+      case nargs
+      when String
+        unless NARGS_NAMES.includes?(nargs)
+          raise ConfigurationError.new("invalid nargs value #{nargs.inspect}")
+        end
+      when Int32
+        raise ConfigurationError.new("invalid nargs value #{nargs}") if nargs < 0
+      end
+    end
+
+    private def check_action_kwargs(action : String, nargs : Int32 | String | Nil, const : Spec) : Nil
+      case action
+      when "store", "append", "extend"
+        if nargs == 0
+          raise ConfigurationError.new("nargs for #{action} actions must be != 0; if you have nothing to store, actions such as store true or store const may be more appropriate")
+        end
+        if !const.is_a?(Unset) && nargs != "?"
+          raise ConfigurationError.new("nargs must be '?' to supply const")
+        end
+      else
+        if !nargs.nil? && nargs != 0
+          raise ConfigurationError.new("nargs must be 0 for action #{action}")
+        end
+      end
+    end
+
+    private def resolve_default(action : String, default : Spec,
+                                positional : Bool, nargs : Int32 | String | Nil) : Spec
+      return default unless default.is_a?(Unset)
+      return @argument_default unless @argument_default.is_a?(Unset)
+      return [] of Value if positional && nargs == "*"
+      case action
+      when "store_true"  then false
+      when "store_false" then true
+      else                    nil
+      end
+    end
+
+    private def check_conflicts(argument : Argument) : Nil
+      argument.option_strings.each do |name|
+        if @option_string_actions.has_key?(name)
+          raise ConfigurationError.new("conflicting option string: #{name}")
+        end
+      end
+    end
+
+    # Overload used when argument names are only known at runtime.
+    def add_argument(names : Array(String), action : String | Nil = nil,
+                     nargs : Int32 | String | Nil = nil,
+                     const : Object? = UNSET, default : Object? = UNSET,
+                     type : String | Symbol | Nil = nil,
+                     choices : Object? = nil,
+                     required : Bool | Nil = nil,
+                     help : String | Suppress | Nil = nil,
+                     metavar : String | Nil = nil,
+                     dest : String | Nil = nil,
+                     version : String | Nil = nil) : Argument
+      add_argument_impl(names, action, nargs, const, default, type,
+        choices, required, help, metavar, dest, version, nil)
+    end
+
+    # Sets defaults for destinations that are not otherwise defined, and
+    # overrides the default of arguments that already exist (like
+    # `argparse.ArgumentParser.set_defaults`).
+    def set_defaults(**defaults) : Nil
+      defaults.each do |key, value|
+        @parser_defaults[key.to_s] = Argparse.normalize(value)
+      end
+      @actions.each do |action|
+        value = defaults[action.dest]?
+        action.default = Argparse.normalize(value) unless value.nil? && !defaults.has_key?(action.dest)
+      end
+    end
+
+    # Returns the default for *dest*, or nil, like `argparse.get_default`.
+    def get_default(dest : String) : Spec
+      @actions.each do |action|
+        default = action.default
+        next if action.dest != dest
+        next if default.is_a?(Unset) || default.is_a?(Suppress) || default.nil?
+        return default
+      end
+      @parser_defaults[dest]? || UNSET
     end
 
     def add_mutually_exclusive_group(required : Bool = false) : MutuallyExclusiveGroup
@@ -249,336 +635,874 @@ module Argparse
       group
     end
 
-    def parse_args(args : Enumerable(String) = ARGV) : Namespace
-      namespace, extras = parse_internal(args.to_a)
-      fail_parse("unrecognized arguments: #{extras.join(" ")}") unless extras.empty?
-      namespace
-    rescue ex : ArgumentError
-      handle_error(ex)
-    end
+    # ---------------------------------------------------------------
+    # Parsing
+    # ---------------------------------------------------------------
 
-    def parse_known_args(args : Enumerable(String) = ARGV) : Tuple(Namespace, Array(String))
-      parse_internal(args.to_a)
-    rescue ex : ArgumentError
-      handle_error(ex)
+    def parse_args(args : Enumerable(String) = ARGV) : Namespace
+      namespace, extras = parse_known_args(args)
+      unless extras.empty?
+        message = "unrecognized arguments: #{extras.join(' ')}"
+        if @exit_on_error
+          error(message)
+        else
+          raise ArgumentError.new(message)
+        end
+      end
+      namespace
     end
 
     def parse(args : Enumerable(String) = ARGV) : Namespace
       parse_args(args)
     end
 
-    private def parse_internal(tokens : Array(String)) : Tuple(Namespace, Array(String))
-      values = {} of String => Value
-      seen = Set(String).new
-      @arguments.each do |argument|
-        initial = default_for(argument)
-        values[argument.dest] = clone_value(initial) unless initial.nil?
+    def parse_known_args(args : Enumerable(String) = ARGV) : Tuple(Namespace, Array(String))
+      namespace = Namespace.new
+      @actions.each do |argument|
+        next if namespace.has_key?(argument.dest)
+        default = argument.default
+        next if default.is_a?(Suppress) || default.is_a?(Unset)
+        namespace[argument.dest] = clone_value(default)
+      end
+      @parser_defaults.each do |dest, default|
+        next if namespace.has_key?(dest)
+        next if default.is_a?(Suppress) || default.is_a?(Unset)
+        namespace[dest] = clone_value(default)
+      end
+      begin
+        extras = parse_known_args_impl(args.to_a, namespace)
+      rescue ex : ArgumentError
+        raise ex unless @exit_on_error
+        error(ex.message || "")
+      end
+      {namespace, extras}
+    end
+
+    # Prints usage to stderr and exits with status 2, like CPython.
+    def error(message : String) : NoReturn
+      STDERR << format_usage
+      STDERR.puts "#{@prog}: error: #{message}"
+      exit(2)
+    end
+
+    private def parse_known_args_impl(arg_strings : Array(String), namespace : Namespace) : Array(String)
+      pattern, option_string_indices = classify(arg_strings)
+      run = ParseRun.new(namespace, @actions)
+
+      max_option_string_index = option_string_indices.keys.max? || -1
+      start_index = 0
+      while start_index <= max_option_string_index
+        next_option_string_index = start_index
+        while next_option_string_index <= max_option_string_index
+          break if option_string_indices.has_key?(next_option_string_index)
+          next_option_string_index += 1
+        end
+
+        if start_index != next_option_string_index
+          positionals_end_index = consume_positionals(run, arg_strings, pattern, start_index)
+          if positionals_end_index > start_index
+            start_index = positionals_end_index
+            next
+          end
+          start_index = positionals_end_index
+        end
+
+        unless option_string_indices.has_key?(start_index)
+          extras_index = start_index
+          while extras_index < next_option_string_index && extras_index < arg_strings.size
+            run.extras << arg_strings[extras_index]
+            extras_index += 1
+          end
+          start_index = next_option_string_index
+        end
+
+        start_index = consume_optional(run, arg_strings, pattern, option_string_indices, start_index)
       end
 
-      positional_tokens = [] of String
-      extras = [] of String
-      options_enabled = true
+      stop_index = consume_positionals(run, arg_strings, pattern, start_index)
+      while stop_index < arg_strings.size
+        run.extras << arg_strings[stop_index]
+        stop_index += 1
+      end
+
+      check_required(run)
+      run.extras
+    end
+
+    # Classifies argv into a pattern of "O" (option), "A" (argument) and
+    # "-" (bare `--`) characters, remembering how each option was spelled.
+    private def classify(arg_strings : Array(String)) : Tuple(String, Hash(Int32, Array(OptionTuple)))
+      builder = String::Builder.new
+      option_string_indices = {} of Int32 => Array(OptionTuple)
       index = 0
-      while index < tokens.size
-        token = tokens[index]
-        if options_enabled && token == "--"
-          options_enabled = false
+      while index < arg_strings.size
+        arg_string = arg_strings[index]
+        if arg_string == "--"
+          builder << '-'
           index += 1
-          next
+          while index < arg_strings.size
+            builder << 'A'
+            index += 1
+          end
+          break
         end
-        if options_enabled && option_token?(token)
-          if cluster = short_flag_cluster(token)
-            cluster.each do |argument|
-              if argument.action == "help"
-                puts format_help
-                exit(0)
-              end
-              apply(argument, [] of String, values)
-              seen << argument.dest
-            end
-            index += 1
-            next
-          end
-          argument, attached = find_option(token)
-          unless argument
-            extras << token
-            index += 1
-            next
-          end
-          if argument.action == "help"
-            puts format_help
-            exit(0)
-          end
-          consumed, raw_values = consume_option(argument, attached, tokens, index + 1)
-          apply(argument, raw_values, values)
-          seen << argument.dest
-          index += consumed + 1
+        if tuples = parse_optional(arg_string)
+          option_string_indices[index] = tuples
+          builder << 'O'
         else
-          positional_tokens << token
-          index += 1
+          builder << 'A'
+        end
+        index += 1
+      end
+      {builder.to_s, option_string_indices}
+    end
+
+    private def parse_optional(arg_string : String) : Array(OptionTuple)?
+      return nil if arg_string.empty?
+      return nil unless @prefix_chars.includes?(arg_string[0])
+
+      if argument = @option_string_actions[arg_string]?
+        return [OptionTuple.new(argument, arg_string, nil, nil)]
+      end
+
+      return nil if arg_string.size == 1
+
+      option_string, separator, explicit_arg = arg_string.partition('=')
+      unless separator.empty?
+        if argument = @option_string_actions[option_string]?
+          return [OptionTuple.new(argument, option_string, separator, explicit_arg)]
         end
       end
 
-      consume_positionals(positional_tokens, values, seen, extras)
-      validate(values, seen)
-      {Namespace.new(values), extras}
+      tuples = get_option_tuples(arg_string)
+      return tuples unless tuples.empty?
+
+      if NEGATIVE_NUMBER.matches?(arg_string) && !@has_negative_number_optionals
+        return nil
+      end
+
+      return nil if arg_string.includes?(' ')
+
+      # Looks like an option, but this parser does not define it.
+      [OptionTuple.new(nil, arg_string, nil, nil)]
     end
 
-    private def option_token?(token : String) : Bool
-      token.size > 1 && token.starts_with?('-') && !negative_number?(token)
-    end
+    private def get_option_tuples(option_string : String) : Array(OptionTuple)
+      result = [] of OptionTuple
+      chars = @prefix_chars
 
-    private def negative_number?(token : String) : Bool
-      !!(token =~ /^-\d+(?:\.\d+)?$/) && !@arguments.any? { |arg| arg.option && arg.names.includes?(token) }
-    end
-
-    private def short_flag_cluster(token : String) : Array(Argument)?
-      return nil unless token.starts_with?('-') && !token.starts_with?("--") && token.size > 2
-      result = [] of Argument
-      token[1..].each_char do |character|
-        argument = @arguments.find { |item| item.option && item.names.includes?("-#{character}") && item.nargs == 0 }
-        return nil unless argument
-        result << argument
+      if option_string.size > 1 && chars.includes?(option_string[0]) && chars.includes?(option_string[1])
+        return result unless @allow_abbrev
+        prefix, separator, explicit_arg = option_string.partition('=')
+        if separator.empty?
+          separator = ""
+          explicit_arg = ""
+        end
+        @option_string_actions.each do |candidate, argument|
+          next unless candidate.starts_with?(prefix)
+          result << OptionTuple.new(argument, candidate,
+            separator.empty? ? nil : separator,
+            separator.empty? ? nil : explicit_arg)
+        end
+      elsif chars.includes?(option_string[0])
+        prefix, separator, explicit_arg = option_string.partition('=')
+        if separator.empty?
+          separator = ""
+          explicit_arg = ""
+        end
+        short_prefix = option_string[0, 2]
+        short_explicit = option_string[2..]
+        @option_string_actions.each do |candidate, argument|
+          if candidate == short_prefix
+            result << OptionTuple.new(argument, candidate, "", short_explicit)
+          elsif @allow_abbrev && candidate.starts_with?(prefix)
+            result << OptionTuple.new(argument, candidate,
+              separator.empty? ? nil : separator,
+              separator.empty? ? nil : explicit_arg)
+          end
+        end
       end
       result
     end
 
-    private def find_option(token : String) : Tuple(Argument?, String?)
-      name, separator, attached = token.partition('=')
-      if argument = @arguments.find { |arg| arg.option && arg.names.includes?(name) }
-        return {argument, separator.empty? ? nil : attached}
+    private def consume_optional(run : ParseRun, arg_strings : Array(String),
+                                 pattern : String,
+                                 option_string_indices : Hash(Int32, Array(OptionTuple)),
+                                 start_index : Int32) : Int32
+      tuples = option_string_indices[start_index]
+      if tuples.size > 1
+        matches = tuples.map(&.option_string).join(", ")
+        raise ArgumentError.new("ambiguous option: #{arg_strings[start_index]} could match #{matches}")
       end
-      if @allow_abbrev && name.starts_with?("--")
-        matches = @arguments.select { |arg| arg.option && arg.names.any? { |candidate| candidate.starts_with?(name) } }
-        return {matches.first, separator.empty? ? nil : attached} if matches.size == 1
-        fail_parse("ambiguous option: #{name}") if matches.size > 1
-      end
-      # Python accepts joined short options such as -nVALUE.
-      if name.starts_with?('-') && !name.starts_with?("--") && name.size > 2
-        if argument = @arguments.find { |arg| arg.names.includes?(name[0, 2]) }
-          return {argument, name[2..]}
-        end
-      end
-      {nil, nil}
-    end
 
-    private def consume_option(argument : Argument, attached : String?, tokens : Array(String), start : Int32) : Tuple(Int32, Array(String))
-      count = argument.nargs
-      return {0, [] of String} if count == 0
-      if attached
-        return {0, [attached]}
-      end
-      case count
-      when Int32
-        fail_parse("argument #{argument.display_name}: expected #{count} argument(s)") if start + count > tokens.size
-        {count, tokens[start, count]}
-      when "?"
-        if start < tokens.size && !option_token?(tokens[start])
-          {1, [tokens[start]]}
-        else
-          {0, [] of String}
-        end
-      when "*", "+"
-        result = [] of String
-        cursor = start
-        while cursor < tokens.size && !option_token?(tokens[cursor])
-          result << tokens[cursor]
-          cursor += 1
-        end
-        fail_parse("argument #{argument.display_name}: expected at least one argument") if count == "+" && result.empty?
-        {result.size, result}
-      else
-        fail_parse("argument #{argument.display_name}: expected one argument") if start >= tokens.size
-        {1, [tokens[start]]}
-      end
-    end
+      option_tuple = tuples.first
+      action = option_tuple.action
+      option_string = option_tuple.option_string
+      sep = option_tuple.sep
+      explicit_arg = option_tuple.explicit_arg
 
-    private def consume_positionals(tokens, values, seen, extras) : Nil
-      positionals = @arguments.reject(&.option)
-      cursor = 0
-      positionals.each_with_index do |argument, argument_index|
-        remaining_required = positionals[(argument_index + 1)..].sum { |item| minimum_count(item) }
-        available = tokens.size - cursor - remaining_required
-        amount = case n = argument.nargs
-                 when Int32 then n
-                 when "?"   then available > 0 ? 1 : 0
-                 when "*"   then Math.max(available, 0)
-                 when "+"   then Math.max(available, 0)
-                 else            1
-                 end
-        fail_parse("the following arguments are required: #{argument.dest}") if amount < minimum_count(argument)
-        raw = amount > 0 ? tokens[cursor, amount] : [] of String
-        apply(argument, raw, values)
-        seen << argument.dest unless raw.empty?
-        cursor += amount
-      end
-      extras.concat(tokens[cursor..]) if cursor < tokens.size
-    end
+      action_tuples = [] of Tuple(Argument, Array(String), String)
+      stop = start_index + 1
 
-    private def minimum_count(argument : Argument) : Int32
-      case n = argument.nargs
-      when Int32    then n
-      when "?", "*" then 0
-      else               1
-      end
-    end
+      while true
+        current = action
+        if current.nil?
+          run.extras << arg_strings[start_index]
+          return start_index + 1
+        end
 
-    private def apply(argument : Argument, raw : Array(String), values : Hash(String, Value)) : Nil
-      converted = raw.map do |value|
-        if choices = argument.choices
-          fail_parse("argument #{argument.display_name}: invalid choice: #{value.inspect}") unless choices.includes?(value)
-        end
-        argument.convert(value)
-      end
-      case argument.action
-      when "store"
-        if argument.nargs == "?" && converted.empty?
-          # An absent optional positional keeps its default; an option using
-          # nargs="?" receives its const value when written without a value.
-          values[argument.dest] = argument.const_value if argument.option
-        elsif multi_value?(argument)
-          values[argument.dest] = converted
-        else
-          values[argument.dest] = converted.first?
-        end
-      when "store_const"
-        values[argument.dest] = argument.const_value
-      when "store_true"
-        values[argument.dest] = true
-      when "store_false"
-        values[argument.dest] = false
-      when "append"
-        current = values[argument.dest]?.as?(Array(Scalar)) || [] of Scalar
-        multi_value?(argument) ? current.concat(converted) : converted.each { |value| current << value }
-        values[argument.dest] = current
-      when "append_const"
-        current = values[argument.dest]?.as?(Array(Scalar)) || [] of Scalar
-        if value = argument.const_value
-          if value.is_a?(Array(Scalar))
-            current.concat(value)
+        matched_explicit = explicit_arg
+        if matched_explicit
+          arg_count = match_argument(current, "A")
+          single_dash = option_string.size > 1 && !@prefix_chars.includes?(option_string[1])
+
+          if arg_count == 0 && single_dash && !matched_explicit.empty?
+            if (sep && !sep.empty?) || @prefix_chars.includes?(matched_explicit[0])
+              raise ArgumentError.new("ignored explicit argument #{Argparse.py_repr(matched_explicit)}", current.name)
+            end
+            action_tuples << {current, [] of String, option_string}
+            char = option_string[0]
+            option_string = "#{char}#{matched_explicit[0]}"
+            if next_action = @option_string_actions[option_string]?
+              action = next_action
+              explicit_arg = matched_explicit[1..]
+              if explicit_arg.empty?
+                sep = nil
+                explicit_arg = nil
+              elsif explicit_arg[0] == '='
+                sep = "="
+                explicit_arg = explicit_arg[1..]
+              else
+                sep = ""
+              end
+            else
+              run.extras << "#{char}#{matched_explicit}"
+              return start_index + 1
+            end
+          elsif arg_count == 1
+            stop = start_index + 1
+            action_tuples << {current, [matched_explicit], option_string}
+            break
           else
-            current << value
+            raise ArgumentError.new("ignored explicit argument #{Argparse.py_repr(matched_explicit)}", current.name)
+          end
+        else
+          start = start_index + 1
+          remaining = start < pattern.size ? pattern[start..] : ""
+          arg_count = match_argument(current, remaining)
+          stop = start + arg_count
+          args = arg_strings[start, arg_count] || [] of String
+          action_tuples << {current, args, option_string}
+          break
+        end
+      end
+
+      action_tuples.each do |taken, args, used_option_string|
+        take_action(run, taken, args, used_option_string)
+      end
+      stop
+    end
+
+    private def consume_positionals(run : ParseRun, arg_strings : Array(String),
+                                    pattern : String, start_index : Int32) : Int32
+      positionals = run.positionals
+      selected_pattern = start_index < pattern.size ? pattern[start_index..] : ""
+      arg_counts = match_arguments_partial(positionals, selected_pattern)
+
+      matched = positionals[0, arg_counts.size]
+      arg_counts.each_with_index do |arg_count, index|
+        action = matched[index]
+        args = arg_strings[start_index, arg_count] || [] of String
+        if action.nargs != "..."
+          if (dash = pattern.index('-', start_index)) && dash < start_index + arg_count
+            # CPython removes a single "--" marker from the matched arguments.
+            if position = args.index("--")
+              args = args.dup
+              args.delete_at(position)
+            end
           end
         end
-        values[argument.dest] = current
-      when "count"
-        current = values[argument.dest]?.as?(Int64) || 0_i64
-        values[argument.dest] = current + 1
+        start_index += arg_count
+        take_action(run, action, args, nil)
+      end
+
+      run.positionals = positionals[arg_counts.size..]? || [] of Argument
+      start_index
+    end
+
+    private def match_argument(action : Argument, pattern : String) : Int32
+      regex = Regex.new("\\A#{nargs_pattern(action)}")
+      match = regex.match(pattern)
+      if match.nil?
+        message = case action.nargs
+                  when nil then "expected one argument"
+                  when "?" then "expected at most one argument"
+                  when "+" then "expected at least one argument"
+                  when Int32
+                    count = action.nargs.as(Int32)
+                    count == 1 ? "expected 1 argument" : "expected #{count} arguments"
+                  else "unexpected arguments"
+                  end
+        raise ArgumentError.new(message, action.name)
+      end
+      match[1].to_s.size
+    end
+
+    private def match_arguments_partial(actions : Array(Argument), pattern : String) : Array(Int32)
+      actions.size.downto(1) do |count|
+        slice = actions[0, count]
+        regex = Regex.new("\\A#{slice.map { |action| nargs_pattern(action) }.join}")
+        match = regex.match(pattern)
+        next if match.nil?
+        result = (1...match.size).map { |index| match[index].to_s.size }
+        if match.end < pattern.size && pattern[match.end] == 'O'
+          while !result.empty? && result.last.zero?
+            result.pop
+          end
+        end
+        return result
+      end
+      [] of Int32
+    end
+
+    private def nargs_pattern(action : Argument) : String
+      option = action.option?
+      case nargs = action.nargs
+      when nil
+        option ? "([A])" : "(-*A-*)"
+      when "?"
+        option ? "(A?)" : "(-*A?-*)"
+      when "*"
+        option ? "(A*)" : "(-*[A-]*)"
+      when "+"
+        option ? "(A+)" : "(-*A[A-]*)"
+      when "..."
+        option ? "([AO]*)" : "(.*)"
+      else
+        count = nargs.as(Int32)
+        option ? "([AO]{#{count}})" : "((?:-*A){#{count}}-*)"
       end
     end
 
-    private def multi_value?(argument : Argument) : Bool
-      n = argument.nargs
-      n.is_a?(Int32) ? n != 1 : n == "*" || n == "+"
-    end
+    private def take_action(run : ParseRun, action : Argument,
+                            arg_strings : Array(String),
+                            option_string : String?) : Nil
+      run.seen_actions << action
+      values = get_values(action, arg_strings)
 
-    private def default_for(argument : Argument) : Value
-      return argument.default_value unless argument.default_value.nil?
-      case argument.action
-      when "store_true"  then false
-      when "store_false" then true
-      when "count"       then 0_i64
-      else                    nil
-      end
-    end
-
-    private def clone_value(value : Value) : Value
-      value.is_a?(Array(Scalar)) ? value.dup : value
-    end
-
-    private def validate(values, seen) : Nil
-      missing = @arguments.select { |argument| argument.option && argument.required && !seen.includes?(argument.dest) }
-      unless missing.empty?
-        fail_parse("the following arguments are required: #{missing.map(&.display_name).join(", ")}")
-      end
-      @groups.each do |group|
-        selected = group.arguments.select { |argument| seen.includes?(argument.dest) }
-        if selected.size > 1
-          fail_parse("argument #{selected.last.display_name}: not allowed with argument #{selected.first.display_name}")
-        elsif group.required? && selected.empty?
-          fail_parse("one of the arguments #{group.arguments.map(&.display_name).join(" ")} is required")
+      if action.option? || !arg_strings.empty?
+        run.seen_non_default << action
+        if conflict = conflicting_action(run, action)
+          raise ArgumentError.new("not allowed with argument #{conflict.name}", action.name)
         end
       end
+
+      return if values.is_a?(Suppress)
+      perform(run, action, values, option_string)
     end
 
-    def format_usage : String
-      return "usage: #{@usage}\n" if @usage
-      parts = ["usage:", @prog]
+    private def conflicting_action(run : ParseRun, action : Argument) : Argument?
       @groups.each do |group|
-        alternatives = group.arguments.map(&.display_name).join(" | ")
-        parts << (group.required? ? "(#{alternatives})" : "[#{alternatives}]")
+        next unless group.arguments.includes?(action)
+        other = group.arguments.find do |candidate|
+          !candidate.same?(action) && run.seen_non_default.includes?(candidate)
+        end
+        return other if other
       end
-      grouped = @groups.flat_map(&.arguments)
-      @arguments.each do |argument|
-        next if grouped.includes?(argument)
-        next if argument.action == "help"
-        label = usage_label(argument)
-        label = "[#{label}]" if argument.option && !argument.required
-        parts << label
-      end
-      parts.join(' ') + "\n"
+      nil
     end
 
-    private def usage_label(argument : Argument) : String
-      return positional_usage(argument) unless argument.option
-      name = argument.names.find(&.starts_with?("--")) || argument.names.first
-      return name if argument.nargs == 0
-      "#{name} #{positional_usage(argument)}"
+    # Mirrors `argparse.ArgumentParser._get_values`.
+    private def get_values(action : Argument, arg_strings : Array(String)) : Spec
+      optional = action.option?
+      if arg_strings.empty? && action.nargs == "?"
+        value = optional ? action.const : action.default
+        if value.is_a?(String)
+          value = action.convert(value)
+        end
+        value
+      elsif arg_strings.empty? && action.nargs == "*" && !optional
+        if action.default.is_a?(Suppress)
+          action.default
+        elsif action.default.nil?
+          [] of Value
+        else
+          action.default
+        end
+      elsif arg_strings.size == 1 && (action.nargs.nil? || action.nargs == "?")
+        value = action.convert(arg_strings.first)
+        check_value(action, value)
+        value
+      elsif action.nargs == "..."
+        convert_all(action, arg_strings)
+      else
+        values = convert_all(action, arg_strings)
+        values.each { |value| check_value(action, value) }
+        values
+      end
     end
 
-    private def positional_usage(argument : Argument) : String
-      name = argument.metavar || argument.dest.upcase
-      case n = argument.nargs
-      when Int32 then Array.new(n, name).join(' ')
-      when "?"   then "[#{name}]"
-      when "*"   then "[#{name} ...]"
-      when "+"   then "#{name} [#{name} ...]"
-      else            name
+    private def convert_all(action : Argument, arg_strings : Array(String)) : Array(Value)
+      values = Array(Value).new
+      arg_strings.each { |item| values << action.convert(item) }
+      values
+    end
+
+    private def check_value(action : Argument, value : Value) : Nil
+      choices = action.choices
+      return if choices.nil?
+      return if choices.any? { |choice| choice == value }
+      rendered = choices.map { |choice| Argparse.py_repr(choice.to_s) }.join(", ")
+      raise ArgumentError.new("invalid choice: #{Argparse.py_repr(value.to_s)} (choose from #{rendered})", action.name)
+    end
+
+    # Mirrors `__call__` of CPython's action classes.
+    private def perform(run : ParseRun, action : Argument, values : Spec,
+                        option_string : String?) : Nil
+      namespace = run.namespace
+      case action.action
+      when "store"
+        namespace[action.dest] = unwrap(values)
+      when "store_const", "store_true", "store_false"
+        namespace[action.dest] = unwrap(action.const)
+      when "boolean_optional"
+        namespace[action.dest] = !(option_string || "").starts_with?("--no-")
+      when "append", "append_const"
+        items = copy_items(namespace[action.dest]?)
+        items << unwrap(action.action == "append" ? values : action.const)
+        namespace[action.dest] = items
+      when "extend"
+        items = copy_items(namespace[action.dest]?)
+        extend_items(items, unwrap(values))
+        namespace[action.dest] = items
+      when "count"
+        count = namespace[action.dest]?
+        namespace[action.dest] = (count.is_a?(Int64) ? count : 0_i64) + 1_i64
+      when "help"
+        puts format_help
+        exit(0)
+      when "version"
+        puts action.version
+        exit(0)
       end
+    end
+
+    # `extend` appends every element of the parsed values, matching CPython's
+    # `_ExtendAction`; a plain string is spread into its characters like a
+    # Python string would be.
+    private def extend_items(items : Array(Value), values : Value) : Nil
+      case values
+      when Array(Value) then values.each { |item| items << item }
+      when String       then values.each_char { |character| items << character.to_s }
+      when Nil          then nil
+      else                   items << values
+      end
+    end
+
+    private def unwrap(value : Spec) : Value
+      case value
+      when Suppress then nil
+      when Unset    then nil
+      else               value
+      end
+    end
+
+    private def copy_items(items : Value) : Array(Value)
+      copy = Array(Value).new
+      case items
+      when Array(Value) then items.each { |item| copy << item }
+      when Nil          then nil
+      else                   copy << items
+      end
+      copy
+    end
+
+    private def clone_value(value : Spec) : Value
+      case value
+      when Array(Value)
+        copy = Array(Value).new
+        value.each { |item| copy << clone_value(item) }
+        copy
+      else
+        unwrap(value)
+      end
+    end
+
+    private def check_required(run : ParseRun) : Nil
+      required_actions = [] of String
+      @actions.each do |action|
+        next if run.seen_actions.includes?(action)
+        if action.required
+          required_actions << action.name
+        else
+          default = action.default
+          if default.is_a?(String) && run.namespace.has_key?(action.dest)
+            # CPython converts string defaults that were never overridden.
+            run.namespace[action.dest] = action.convert(default)
+          end
+        end
+      end
+      unless required_actions.empty?
+        raise ArgumentError.new("the following arguments are required: #{required_actions.join(", ")}")
+      end
+
+      @groups.each do |group|
+        next unless group.required?
+        next if group.arguments.any? { |action| run.seen_non_default.includes?(action) }
+        names = group.arguments.map(&.name).join(' ')
+        raise ArgumentError.new("one of the arguments #{names} is required")
+      end
+    end
+
+    # ---------------------------------------------------------------
+    # Help formatting
+    # ---------------------------------------------------------------
+
+    MAX_HELP_POSITION = 24
+    INDENT            =  2
+
+    # `usage: ...` followed by a blank line, like Python's internal
+    # `_format_usage`.
+    def format_usage : String
+      block = usage_block
+      return "" if block.empty?
+      block.rstrip('\n') + "\n"
+    end
+
+    def print_usage(io : IO = STDERR) : Nil
+      io << format_usage
     end
 
     def format_help : String
+      buffer = String.build do |io|
+        io << usage_block
+        if text = @description
+          io << expand_text(text) << "\n\n"
+        end
+        visible = @actions.reject { |argument| argument.help.is_a?(Suppress) }
+        column = help_column
+        positionals = visible.reject(&.option?)
+        optionals = visible.select(&.option?)
+        write_actions(io, "positional arguments", positionals, column) unless positionals.empty?
+        write_actions(io, "options", optionals, column) unless optionals.empty?
+        if text = @epilog
+          io << expand_text(text) << "\n\n"
+        end
+      end
+      buffer.rstrip('\n') + "\n"
+    end
+
+    def print_help(io : IO = STDOUT) : Nil
+      io << format_help
+    end
+
+    def to_s(io : IO) : Nil
+      io << format_help
+    end
+
+    private def usage_block : String
+      return "" if @usage.is_a?(Suppress)
       String.build do |io|
-        io << format_usage
-        io << '\n'
-        io << @description << "\n\n" if @description
-        positionals = @arguments.reject(&.option)
-        options = @arguments.select(&.option)
-        write_help_section(io, "positional arguments", positionals) unless positionals.empty?
-        write_help_section(io, "options", options) unless options.empty?
-        io << @epilog << '\n' if @epilog
+        io << "usage: "
+        case declared = @usage
+        when String
+          io << expand_text(declared)
+        else
+          io << usage_layout
+        end
+        io << "\n\n"
       end
     end
 
-    private def write_help_section(io, title, arguments) : Nil
-      io << title << ":\n"
-      width = arguments.max_of? { |argument| help_label(argument).size } || 0
-      arguments.each do |argument|
-        label = help_label(argument)
-        io << "  " << label
-        if text = argument.help
-          io << " " * (width - label.size + 2) << text.gsub("%(default)s", argument.default_value.to_s)
+    private def usage_layout : String
+      actions = @actions.reject { |argument| argument.help.is_a?(Suppress) }
+      return @prog if actions.empty?
+
+      parts, positionals_start = usage_parts(actions)
+      usage = ([@prog] + parts).join(' ')
+      prefix = "usage: "
+      return usage if prefix.size + usage.size <= @width
+
+      optionals = parts[0, positionals_start]
+      positionals = parts[positionals_start..]? || [] of String
+      lines = [] of String
+      if prefix.size + @prog.size <= 0.75 * @width
+        indent = " " * (prefix.size + @prog.size + 1)
+        if !optionals.empty?
+          lines = wrap_usage_parts([@prog] + optionals, indent, prefix)
+          lines.concat(wrap_usage_parts(positionals, indent, nil))
+        elsif !positionals.empty?
+          lines = wrap_usage_parts([@prog] + positionals, indent, prefix)
+        else
+          lines = [@prog]
         end
-        io << '\n'
+      else
+        indent = " " * prefix.size
+        combined = wrap_usage_parts(optionals + positionals, indent, nil)
+        if combined.size > 1
+          lines = wrap_usage_parts(optionals, indent, nil)
+          lines.concat(wrap_usage_parts(positionals, indent, nil))
+        else
+          lines = combined
+        end
+        lines = [@prog] + lines
+      end
+      lines.join('\n')
+    end
+
+    private def wrap_usage_parts(parts : Array(String), indent : String,
+                                 first_prefix : String?) : Array(String)
+      lines = [] of String
+      line = [] of String
+      indent_length = indent.size
+      line_length = first_prefix ? first_prefix.size - 1 : indent_length - 1
+      parts.each do |part|
+        if line_length + 1 + part.size > @width && !line.empty?
+          lines << indent + line.join(' ')
+          line = [] of String
+          line_length = indent_length - 1
+        end
+        line << part
+        line_length += part.size + 1
+      end
+      lines << indent + line.join(' ') unless line.empty?
+      if first_prefix && !lines.empty? && lines.first.size >= indent_length
+        lines[0] = lines.first[indent_length, lines.first.size - indent_length]
+      end
+      lines
+    end
+
+    # Port of `argparse.HelpFormatter._get_actions_usage_parts`.
+    private def usage_parts(actions : Array(Argument)) : Tuple(Array(String), Int32)
+      groups = {} of Argument => MutuallyExclusiveGroup
+      @groups.each do |group|
+        group.arguments.each { |argument| groups[argument] = group if actions.includes?(argument) }
+      end
+
+      optionals = [] of Tuple(Bool, Array(Argument))
+      positionals = [] of Tuple(Bool, Array(Argument))
+      emitted = Set(Argument).new
+
+      actions.each do |action|
+        next if emitted.includes?(action)
+        next unless action.option?
+        if group = groups[action]?
+          members = [action]
+          group.arguments.each do |candidate|
+            next unless candidate.option?
+            next if candidate.same?(action)
+            next if emitted.includes?(candidate)
+            next unless groups[candidate]?.try(&.same?(group))
+            members << candidate
+          end
+          members.each { |member| emitted << member }
+          optionals << {group.required?, members}
+        else
+          emitted << action
+          optionals << {false, [action]}
+        end
+      end
+
+      actions.each do |action|
+        next if emitted.includes?(action)
+        next if action.option?
+        if group = groups[action]?
+          members = [] of Argument
+          group.arguments.each do |candidate|
+            next unless candidate.option?
+            next if emitted.includes?(candidate)
+            next unless groups[candidate]?.try(&.same?(group))
+            members << candidate
+          end
+          members << action
+          members.each { |member| emitted << member }
+          positionals << {group.required?, members}
+        else
+          emitted << action
+          positionals << {false, [action]}
+        end
+      end
+
+      parts = [] of String
+      positionals_start = 0
+      entries = optionals + positionals
+      entries.each_with_index do |(required, members), entry_index|
+        positionals_start = parts.size if entry_index == optionals.size
+        in_group = members.size > 1
+        start = parts.size
+        members.each do |argument|
+          part = if argument.option?
+                   if argument.nargs == 0
+                     argument.option_strings.first
+                   else
+                     "#{argument.option_strings.first} #{args_usage(argument)}"
+                   end
+                 else
+                   args_usage(argument)
+                 end
+          if in_group && !argument.option?
+            if part.starts_with?('[') && part.ends_with?(']') && part.size > 1
+              part = part[1, part.size - 2]
+            end
+          end
+          if argument.option?
+            part = "[#{part}]" unless argument.required || required || in_group
+          end
+          parts << part
+        end
+        next unless in_group
+        parts[start] = (required ? "(" : "[") + parts[start]
+        (start...(parts.size - 1)).each { |index| parts[index] += " |" }
+        parts[parts.size - 1] += required ? ")" : "]"
+      end
+      {parts, positionals_start}
+    end
+
+    private def args_usage(argument : Argument) : String
+      metavar = metavar_for(argument)
+      case nargs = argument.nargs
+      when nil   then metavar
+      when "?"   then "[#{metavar}]"
+      when "*"   then "[#{metavar} ...]"
+      when "+"   then "#{metavar} [#{metavar} ...]"
+      when "..." then "..."
+      else            Array.new(nargs.as(Int32), metavar).join(' ')
+      end
+    end
+
+    private def metavar_for(argument : Argument) : String
+      if metavar = argument.metavar
+        return metavar
+      end
+      if choices = argument.choices
+        return "{#{choices.map { |choice| Argparse.py_str(choice) }.join(',')}}"
+      end
+      argument.option? ? argument.dest.upcase : argument.dest
+    end
+
+    private def help_column : Int32
+      longest = 0
+      @actions.each do |argument|
+        next if argument.help.is_a?(Suppress)
+        size = invocation(argument).size + INDENT
+        longest = size if size > longest
+      end
+      max_help_position = Math.min(MAX_HELP_POSITION, Math.max(@width - 20, INDENT * 2))
+      Math.min(longest + INDENT, max_help_position)
+    end
+
+    private def invocation(argument : Argument) : String
+      return metavar_for(argument) unless argument.option?
+      names = argument.option_strings.join(", ")
+      return names if argument.nargs == 0
+      "#{names} #{args_usage(argument)}"
+    end
+
+    private def write_actions(io : IO, title : String, arguments : Array(Argument),
+                              column : Int32) : Nil
+      io << title << ":\n"
+      action_width = column - INDENT - 2
+      help_width = Math.max(@width - column, 11)
+
+      arguments.each do |argument|
+        header = invocation(argument)
+        io << " " * INDENT
+        help_text = argument.help
+        if help_text.nil? || help_text.is_a?(Suppress)
+          io << header << '\n'
+          next
+        end
+
+        if header.size <= action_width
+          io << header << " " * (action_width - header.size + 2)
+          first_line_column = 0
+        else
+          io << header << '\n'
+          first_line_column = column
+        end
+
+        expanded = expand_help(argument, help_text)
+        if expanded.strip.empty?
+          io << '\n'
+          next
+        end
+        lines = wrap_text(expanded, help_width)
+        io << " " * first_line_column << lines.first << '\n'
+        lines[1..].each { |line| io << " " * column << line << '\n' }
       end
       io << '\n'
     end
 
-    private def help_label(argument : Argument) : String
-      return argument.metavar || argument.dest if !argument.option
-      suffix = argument.nargs == 0 ? "" : " #{argument.metavar || argument.dest.upcase}"
-      argument.names.join(", ") + suffix
+    # Expands `%(prog)s` and friends in description/epilog/usage text.
+    private def expand_text(text : String) : String
+      text.gsub("%(prog)s", @prog).gsub("%%", "%")
     end
 
-    private def fail_parse(message : String) : NoReturn
-      raise ArgumentError.new(message)
+    private def expand_help(argument : Argument, template : String) : String
+      result = String.build do |io|
+        index = 0
+        while index < template.size
+          if template[index] == '%' && index + 1 < template.size
+            following = template[index + 1]
+            if following == '%'
+              io << '%'
+              index += 2
+              next
+            elsif following == '('
+              if close = template.index(')', index)
+                key = template[(index + 2)...close]
+                if replacement = help_parameter(argument, key)
+                  io << replacement
+                  index = close + 1
+                  index += 1 if index < template.size && template[index] == 's'
+                  next
+                end
+              end
+            end
+          end
+          io << template[index]
+          index += 1
+        end
+      end
+      result
     end
 
-    private def handle_error(ex : ArgumentError)
-      raise ex unless @exit_on_error
-      STDERR << format_usage
-      STDERR.puts "#{@prog}: error: #{ex.message}"
-      exit(2)
+    private def help_parameter(argument : Argument, key : String) : String?
+      case key
+      when "prog"    then @prog
+      when "dest"    then argument.dest
+      when "type"    then argument.type_name
+      when "metavar" then argument.metavar
+      when "choices" then argument.choices.try { |choices| choices.map { |choice| Argparse.py_str(choice) }.join(", ") }
+      when "const"   then argument.const.is_a?(Suppress) ? nil : Argparse.py_str(unwrap(argument.const))
+      when "default" then argument.default.is_a?(Suppress) ? nil : Argparse.py_str(unwrap(argument.default))
+      else                nil
+      end
+    end
+
+    # Greedy word wrapping equivalent to `textwrap.wrap` for the help strings
+    # this formatter produces.
+    private def wrap_text(text : String, width : Int32) : Array(String)
+      words = text.split(/\s+/).reject(&.empty?)
+      return [""] if words.empty?
+      lines = [] of String
+      current = ""
+      words.each do |word|
+        if current.empty?
+          current = word
+        elsif current.size + 1 + word.size <= width
+          current = "#{current} #{word}"
+        else
+          lines << current
+          current = word
+        end
+        while current.size > width
+          lines << current[0, width]
+          current = current[width..]
+        end
+      end
+      lines << current unless current.empty?
+      lines
     end
   end
 end
