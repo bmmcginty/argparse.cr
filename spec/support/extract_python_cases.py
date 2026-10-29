@@ -113,7 +113,12 @@ def encode_kwargs(kwargs, argument_kwargs):
         elif key == "type":
             encoded[key] = encode_type(argument_kwargs, value)
         elif key == "choices":
-            encoded[key] = [encode_choice(item, argument_kwargs) for item in value]
+            choices = [encode_choice(item, argument_kwargs) for item in value]
+            # Sets iterate in hash order, which changes between Python
+            # processes; sort them so regeneration is reproducible.
+            if isinstance(value, (set, frozenset)):
+                choices.sort()
+            encoded[key] = choices
         elif key in ("const", "default"):
             encoded[key] = encode_value(value)
         elif key in ("nargs", "dest", "required", "help", "version"):
