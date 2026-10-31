@@ -4,10 +4,10 @@ Items are checked off as they are implemented and verified.
 
 ## Parser construction and argument containers
 
-- [ ] `parents=` parser inheritance, including parent argument groups and mutually exclusive groups
-- [ ] `add_argument_group(title:, description:)` and group help layout
-- [ ] `add_mutually_exclusive_group` inside an argument group
-- [ ] `conflict_handler: "error" | "resolve"`
+- [x] `parents=` parser inheritance, including parent argument groups and mutually exclusive groups
+- [x] `add_argument_group(title:, description:)` and group help layout
+- [x] `add_mutually_exclusive_group` inside an argument group
+- [x] `conflict_handler: "error" | "resolve"`
 - [ ] `formatter_class:` and the built-in formatters (`HelpFormatter`, `RawDescriptionHelpFormatter`, `RawTextHelpFormatter`, `ArgumentDefaultsHelpFormatter`, `MetavarTypeHelpFormatter`)
 - [ ] custom `HelpFormatter` subclasses
 

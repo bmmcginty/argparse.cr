@@ -320,11 +320,18 @@ module Argparse
     end
   end
 
-  # A group of optionals where at most one may be used.
-  class MutuallyExclusiveGroup
+  # A named group of arguments.  `title` and `description` are rendered as a
+  # separate section in help output, like CPython's `ArgumentGroup`.
+  class ArgumentGroup
+    getter parser : ArgumentParser
+    getter title : String | Suppress | Nil
+    getter description : String | Suppress | Nil
     getter arguments = [] of Argument
+    getter required : Bool
 
-    def initialize(@parser : ArgumentParser, @required : Bool)
+    def initialize(@parser : ArgumentParser, @title : String | Suppress | Nil = nil,
+                   @description : String | Suppress | Nil = nil,
+                   @required : Bool = false)
     end
 
     def required? : Bool
@@ -332,19 +339,47 @@ module Argparse
     end
 
     def add_argument(*args : String, **options) : Argument
-      register(@parser.add_argument(*args, **options))
+      @parser.add_group_argument(self, *args, **options)
     end
 
     def add_argument(*args : String, &converter : String -> Value) : Argument
-      register(@parser.add_argument(*args, &converter))
+      @parser.add_group_argument(self, *args, &converter)
     end
 
-    private def register(argument : Argument) : Argument
-      unless argument.option?
-        raise ConfigurationError.new("mutually exclusive arguments must be optional")
-      end
-      @arguments << argument
-      argument
+    def add_argument(names : Array(String), **options) : Argument
+      @parser.add_group_argument(self, names, **options)
+    end
+
+    def add_mutually_exclusive_group(required : Bool = false) : MutuallyExclusiveGroup
+      @parser.add_mutually_exclusive_group(required, self)
+    end
+  end
+
+  # A group of optionals where at most one may be used.  It delegates adding
+  # an action to its containing group (or the parser's normal optional /
+  # positional group), then records the action as a member of the mutex.
+  class MutuallyExclusiveGroup < ArgumentGroup
+    getter container : ArgumentGroup?
+
+    def initialize(parser : ArgumentParser, required : Bool,
+                   @container : ArgumentGroup? = nil)
+      super(parser, nil, nil, required)
+    end
+
+    def add_argument(*args : String, **options) : Argument
+      @parser.add_mutex_argument(self, *args, **options)
+    end
+
+    def add_argument(*args : String, &converter : String -> Value) : Argument
+      @parser.add_mutex_argument(self, *args, &converter)
+    end
+
+    def add_argument(names : Array(String), **options) : Argument
+      @parser.add_mutex_argument(self, names, **options)
+    end
+
+    def add_mutually_exclusive_group(required : Bool = false) : MutuallyExclusiveGroup
+      raise ConfigurationError.new("mutually exclusive groups cannot be nested")
     end
   end
 
@@ -377,6 +412,7 @@ module Argparse
     getter prefix_chars : String
     getter allow_abbrev : Bool
     getter argument_default : Spec
+    getter conflict_handler : String
     # Width of the formatter, like Python's `HelpFormatter` width (the
     # terminal width minus two columns).
     getter width : Int32
@@ -387,22 +423,36 @@ module Argparse
     @actions = [] of Argument
     @option_string_actions = {} of String => Argument
     @groups = [] of MutuallyExclusiveGroup
+    @argument_groups = [] of ArgumentGroup
+    @positionals_group : ArgumentGroup?
+    @optionals_group : ArgumentGroup?
     @has_negative_number_optionals = false
     @parser_defaults = {} of String => Spec
 
     def initialize(prog : String? = nil, @usage : String | Suppress | Nil = nil,
                    @description : String? = nil, @epilog : String? = nil,
+                   parents : Array(ArgumentParser) = [] of ArgumentParser,
                    @add_help : Bool = true, @prefix_chars : String = "-",
                    @allow_abbrev : Bool = true,
                    @argument_default : Spec = UNSET,
+                   conflict_handler : String = "error",
                    @exit_on_error : Bool = true,
                    @width : Int32 = 78)
       @prog = prog || File.basename(PROGRAM_NAME)
+      @conflict_handler = conflict_handler
+      unless conflict_handler == "error" || conflict_handler == "resolve"
+        raise ConfigurationError.new("invalid conflict_resolution value: #{conflict_handler.inspect}")
+      end
+      @positionals_group = ArgumentGroup.new(self, "positional arguments")
+      @optionals_group = ArgumentGroup.new(self, "options")
+      @argument_groups = [@positionals_group.not_nil!, @optionals_group.not_nil!] of ArgumentGroup
+
       if @add_help
         prefix = @prefix_chars.includes?('-') ? '-' : @prefix_chars[0]
         add_argument("#{prefix}h", "#{prefix}#{prefix}help", action: "help",
           default: SUPPRESS, help: "show this help message and exit")
       end
+      parents.each { |parent| add_parent(parent) }
     end
 
     # ---------------------------------------------------------------
@@ -420,7 +470,7 @@ module Argparse
                      dest : String | Nil = nil,
                      version : String | Nil = nil) : Argument
       add_argument_impl(args.to_a, action, nargs, const, default, type,
-        choices, required, help, metavar, dest, version, nil)
+        choices, required, help, metavar, dest, version, nil, nil)
     end
 
     def add_argument(*args : String, action : String | Nil = nil,
@@ -435,7 +485,65 @@ module Argparse
                      version : String | Nil = nil,
                      &converter : String -> Value) : Argument
       add_argument_impl(args.to_a, action, nargs, const, default, type,
-        choices, required, help, metavar, dest, version, converter)
+        choices, required, help, metavar, dest, version, converter, nil)
+    end
+
+    # :nodoc:
+    def add_group_argument(group : ArgumentGroup, *args : String, **options) : Argument
+      add_argument_impl(args.to_a, options[:action]?, options[:nargs]?,
+        options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
+        options[:choices]?, options[:required]?, options[:help]?,
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group)
+    end
+
+    # :nodoc:
+    def add_group_argument(group : ArgumentGroup, *args : String,
+                           &converter : String -> Value) : Argument
+      add_argument_impl(args.to_a, nil, nil, UNSET, UNSET, nil, nil, nil,
+        nil, nil, nil, nil, converter, group)
+    end
+
+    # :nodoc:
+    def add_group_argument(group : ArgumentGroup, names : Array(String), **options) : Argument
+      add_argument_impl(names, options[:action]?, options[:nargs]?,
+        options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
+        options[:choices]?, options[:required]?, options[:help]?,
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group)
+    end
+
+    # :nodoc:
+    def add_mutex_argument(group : MutuallyExclusiveGroup, *args : String, **options) : Argument
+      argument = add_argument_impl(args.to_a, options[:action]?, options[:nargs]?,
+        options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
+        options[:choices]?, options[:required]?, options[:help]?,
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group.container)
+      register_mutex_argument(group, argument)
+    end
+
+    # :nodoc:
+    def add_mutex_argument(group : MutuallyExclusiveGroup, *args : String,
+                           &converter : String -> Value) : Argument
+      argument = add_argument_impl(args.to_a, nil, nil, UNSET, UNSET, nil, nil,
+        nil, nil, nil, nil, nil, converter, group.container)
+      register_mutex_argument(group, argument)
+    end
+
+    # :nodoc:
+    def add_mutex_argument(group : MutuallyExclusiveGroup, names : Array(String), **options) : Argument
+      argument = add_argument_impl(names, options[:action]?, options[:nargs]?,
+        options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
+        options[:choices]?, options[:required]?, options[:help]?,
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group.container)
+      register_mutex_argument(group, argument)
+    end
+
+    private def register_mutex_argument(group : MutuallyExclusiveGroup,
+                                        argument : Argument) : Argument
+      unless argument.option?
+        raise ConfigurationError.new("mutually exclusive arguments must be optional")
+      end
+      group.arguments << argument
+      argument
     end
 
     private def add_argument_impl(names : Array(String), action : String?,
@@ -446,7 +554,8 @@ module Argparse
                                   help : String | Suppress | Nil,
                                   metavar : String?, dest : String?,
                                   version : String?,
-                                  converter : Proc(String, Value)?) : Argument
+                                  converter : Proc(String, Value)?,
+                                  target_group : ArgumentGroup?) : Argument
       const = Argparse.normalize(raw_const)
       default = Argparse.normalize(raw_default)
       type = raw_type.is_a?(Symbol) ? raw_type.to_s : raw_type
@@ -516,6 +625,8 @@ module Argparse
         required_flag, help, metavar, version, converter)
       check_conflicts(argument)
       @actions << argument
+      group = target_group || (option_strings.empty? ? @positionals_group.not_nil! : @optionals_group.not_nil!)
+      group.arguments << argument
       unless option_strings.empty?
         option_strings.each { |name| @option_string_actions[name] = argument }
         if option_strings.any? { |name| NEGATIVE_NUMBER.matches?(name) }
@@ -583,11 +694,30 @@ module Argparse
     end
 
     private def check_conflicts(argument : Argument) : Nil
-      argument.option_strings.each do |name|
-        if @option_string_actions.has_key?(name)
-          raise ConfigurationError.new("conflicting option string: #{name}")
-        end
+      conflicting = argument.option_strings.compact_map do |name|
+        existing = @option_string_actions[name]?
+        existing ? {name, existing} : nil
       end
+      return if conflicting.empty?
+
+      if @conflict_handler == "resolve"
+        conflicting.each do |name, existing|
+          existing.option_strings.delete(name)
+          @option_string_actions.delete(name)
+          remove_action(existing) if existing.option_strings.empty?
+        end
+      else
+        names = conflicting.map(&.first)
+        message = names.size == 1 ? "conflicting option string: #{names.first}" :
+          "conflicting option strings: #{names.join(", ")}"
+        raise ConfigurationError.new(message)
+      end
+    end
+
+    private def remove_action(action : Argument) : Nil
+      @actions.delete(action)
+      @argument_groups.each { |group| group.arguments.delete(action) }
+      @groups.each { |group| group.arguments.delete(action) }
     end
 
     # Overload used when argument names are only known at runtime.
@@ -602,7 +732,68 @@ module Argparse
                      dest : String | Nil = nil,
                      version : String | Nil = nil) : Argument
       add_argument_impl(names, action, nargs, const, default, type,
-        choices, required, help, metavar, dest, version, nil)
+        choices, required, help, metavar, dest, version, nil, nil)
+    end
+
+    # Adds a named group of arguments.  Groups are rendered as their own help
+    # sections, in the order they were created.
+    def add_argument_group(title : String | Suppress | Nil = nil,
+                           description : String | Suppress | Nil = nil) : ArgumentGroup
+      group = ArgumentGroup.new(self, title, description)
+      @argument_groups << group
+      group
+    end
+
+    # Adds an action from a parent parser to this parser, preserving the
+    # parent's group layout and optionally its mutually exclusive membership.
+    private def add_parent(parent : ArgumentParser) : Nil
+      unless parent.is_a?(ArgumentParser)
+        raise ConfigurationError.new("parents must be a list of ArgumentParser")
+      end
+
+      targets = {} of ArgumentGroup => ArgumentGroup
+      parent.@argument_groups.each do |parent_group|
+        target = @argument_groups.find { |group| group.title == parent_group.title }
+        unless target
+          target = ArgumentGroup.new(self, parent_group.title, parent_group.description)
+          @argument_groups << target
+        end
+        targets[parent_group] = target
+      end
+
+      parent.@actions.each do |argument|
+        source = parent.@argument_groups.find { |group| group.arguments.includes?(argument) }
+        target = source ? targets[source] : @optionals_group.not_nil!
+        add_existing_argument(argument, target)
+      end
+
+      parent.@groups.each do |parent_group|
+        container = if source = parent_group.container
+                      @argument_groups.find { |group| group.title == source.title }
+                    end
+        mutex = MutuallyExclusiveGroup.new(self, parent_group.required?, container)
+        parent_group.arguments.each do |argument|
+          mutex.arguments << argument if @actions.includes?(argument)
+        end
+        @groups << mutex
+      end
+
+      parent.@parser_defaults.each do |dest, default|
+        @parser_defaults[dest] = default
+      end
+    end
+
+    private def add_existing_argument(argument : Argument,
+                                      target_group : ArgumentGroup) : Nil
+      check_conflicts(argument)
+      @actions << argument
+      target_group.arguments << argument
+      argument.option_strings.each do |name|
+        @option_string_actions[name] = argument
+        if NEGATIVE_NUMBER.matches?(name)
+          @has_negative_number_optionals = true
+        end
+      end
     end
 
     # Sets defaults for destinations that are not otherwise defined, and
@@ -629,8 +820,9 @@ module Argparse
       @parser_defaults[dest]? || UNSET
     end
 
-    def add_mutually_exclusive_group(required : Bool = false) : MutuallyExclusiveGroup
-      group = MutuallyExclusiveGroup.new(self, required)
+    def add_mutually_exclusive_group(required : Bool = false,
+                                     container : ArgumentGroup? = nil) : MutuallyExclusiveGroup
+      group = MutuallyExclusiveGroup.new(self, required, container)
       @groups << group
       group
     end
@@ -1179,12 +1371,8 @@ module Argparse
         if text = @description
           io << expand_text(text) << "\n\n"
         end
-        visible = @actions.reject { |argument| argument.help.is_a?(Suppress) }
         column = help_column
-        positionals = visible.reject(&.option?)
-        optionals = visible.select(&.option?)
-        write_actions(io, "positional arguments", positionals, column) unless positionals.empty?
-        write_actions(io, "options", optionals, column) unless optionals.empty?
+        @argument_groups.each { |group| write_group(io, group, column) }
         if text = @epilog
           io << expand_text(text) << "\n\n"
         end
@@ -1398,9 +1586,22 @@ module Argparse
       "#{names} #{args_usage(argument)}"
     end
 
-    private def write_actions(io : IO, title : String, arguments : Array(Argument),
+    private def write_group(io : IO, group : ArgumentGroup, column : Int32) : Nil
+      visible = group.arguments.reject { |argument| argument.help.is_a?(Suppress) }
+      return if visible.empty?
+      title = group.title
+      if title && !title.is_a?(Suppress)
+        io << title << ":\n"
+      end
+      description = group.description
+      if description && !description.is_a?(Suppress)
+        io << " " * INDENT << expand_text(description) << "\n\n"
+      end
+      write_actions(io, visible, column)
+    end
+
+    private def write_actions(io : IO, arguments : Array(Argument),
                               column : Int32) : Nil
-      io << title << ":\n"
       action_width = column - INDENT - 2
       help_width = Math.max(@width - column, 11)
 
