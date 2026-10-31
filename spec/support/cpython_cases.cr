@@ -1,6 +1,6 @@
 require "spec"
 require "json"
-require "../../argparse"
+require "../../src/argparse"
 
 # Support code for the CPython derived conformance suite.
 #

@@ -1,2 +1,2 @@
 require "spec"
-require "../argparse"
+require "../src/argparse"

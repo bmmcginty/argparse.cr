@@ -1,0 +1,11 @@
+name: argparse
+version: 0.2.0
+
+authors:
+  - Brandon McGinty <git@bmcginty.us>
+
+description: |
+  A Crystal port of Python's argparse, including subcommands, argument
+  groups, formatters, argument files, and CPython-compatible parsing.
+
+crystal: ">= 1.0.0"

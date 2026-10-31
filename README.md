@@ -9,6 +9,29 @@ classified into a pattern of option (`O`) and argument (`A`) characters and
 way they do in Python.  Usage and help messages are laid out the same way too,
 including line wrapping.
 
+## Installation
+
+Add the shard to your project's `shard.yml`:
+
+```yaml
+dependencies:
+  argparse:
+    github: bmmcginty/argparse
+```
+
+Then install dependencies and require the library:
+
+```console
+$ shards install
+```
+
+```crystal
+require "argparse"
+```
+
+The library source is `src/argparse.cr`, so `require "argparse"` resolves
+normally once the shard is installed.
+
 ## Usage
 
 ```crystal
