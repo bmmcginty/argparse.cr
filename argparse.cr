@@ -1,3 +1,5 @@
+require "complex"
+
 # A command line parser modelled after Python's `argparse` module.
 #
 # The parsing algorithm follows CPython's `argparse`: argv is classified into a
@@ -10,7 +12,7 @@ module Argparse
 
   # A value that can be stored in a {Namespace}.  The alias is recursive
   # because `nargs` may nest values, e.g. `append` combined with `nargs: "*"`.
-  alias Value = String | Int64 | Float64 | Bool | Array(Value) | IO | Nil
+  alias Value = String | Int64 | Float64 | Complex | Bool | Array(Value) | IO | Nil
 
   # Placeholder for "the caller did not supply this keyword argument".
   class Unset
@@ -72,6 +74,7 @@ module Argparse
     when UInt8, UInt16, UInt32, UInt64 then value.to_i64
     when Float32                       then value.to_f64
     when Float64                       then value
+    when Complex                       then value
     when IO                            then value
     when Enum                          then value.to_s
     when Array
@@ -263,8 +266,25 @@ module Argparse
     when true  then "True"
     when false then "False"
     when IO then value.to_s
+    when Complex
+      real = value.real
+      imag = value.imag
+      if real == 0.0 && imag != 0.0
+        "#{py_complex_number(imag)}j"
+      else
+        sign = imag < 0 ? "" : "+"
+        "(#{py_complex_number(real)}#{sign}#{py_complex_number(imag)}j)"
+      end
     when Array(Value)
       "[#{value.map { |item| py_repr(item) }.join(", ")}]"
+    else
+      value.to_s
+    end
+  end
+
+  private def self.py_complex_number(value : Float64) : String
+    if value == value.trunc && value.finite?
+      value.to_i64.to_s
     else
       value.to_s
     end
@@ -467,6 +487,12 @@ module Argparse
         rescue ex
           raise ArgumentError.new("invalid float value: #{Argparse.py_repr(text)}", name)
         end
+      when "complex", "Complex"
+        begin
+          Argument.parse_complex(text)
+        rescue ex
+          raise ArgumentError.new("invalid complex value: #{Argparse.py_repr(text)}", name)
+        end
       else
         raise ConfigurationError.new("unknown argument type #{@type_name.inspect}")
       end
@@ -483,17 +509,46 @@ module Argparse
 
     # Float parsing accepting what Python's `float()` accepts.
     def self.parse_float(text : String) : Float64
-      trimmed = text.strip.delete('_')
+      trimmed = text.strip
       case trimmed.downcase
       when "inf", "+inf", "infinity", "+infinity" then Float64::INFINITY
       when "-inf", "-infinity"                    then -Float64::INFINITY
       when "nan", "+nan", "-nan"                  then Float64::NAN
-      when /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
-        trimmed.to_f64
+      when /\A[+-]?(?:(?:\d(?:_?\d)*)(?:\.(?:\d(?:_?\d)*)?)?|\.(?:\d(?:_?\d)*))(?:[eE][+-]?\d(?:_?\d)*)?\z/
+        trimmed.delete('_').to_f64
       else
         raise ArgumentError.new("invalid float value: #{Argparse.py_repr(text)}")
       end
     end
+    # Complex parsing accepting the forms Python's `complex()` accepts.
+    def self.parse_complex(text : String) : Complex
+      trimmed = text.strip
+      unless trimmed.downcase.ends_with?('j')
+        return Complex.new(Argument.parse_float(trimmed), 0.0)
+      end
+      body = trimmed[0...-1]
+      return Complex.new(0.0, 1.0) if body.empty? || body == "+"
+      return Complex.new(0.0, -1.0) if body == "-"
+      split_index = -1
+      index = body.size - 1
+      while index > 0
+        char = body[index]
+        if char == '+' || char == '-'
+          previous = body[index - 1]
+          split_index = index unless previous == 'e' || previous == 'E'
+          break
+        end
+        index -= 1
+      end
+      if split_index > 0
+        real = Argument.parse_float(body[0...split_index])
+        imag = Argument.parse_float(body[split_index..])
+        Complex.new(real, imag)
+      else
+        Complex.new(0.0, Argument.parse_float(body))
+      end
+    end
+
   end
 
   # Base help formatter.  The public hook points mirror the parts of Python's
