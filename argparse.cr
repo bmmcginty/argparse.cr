@@ -2258,7 +2258,9 @@ module Argparse
         start = parts.size
         members.each do |argument|
           part = if argument.option?
-                   if argument.nargs == 0
+                   if argument.action == "boolean_optional"
+                     argument.option_strings.join(" | ")
+                   elsif argument.nargs == 0
                      argument.option_strings.first
                    else
                      "#{argument.option_strings.first} #{args_usage(argument)}"
