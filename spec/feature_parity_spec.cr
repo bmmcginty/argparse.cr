@@ -366,3 +366,46 @@ describe "tuple metavars and suppressed arguments" do
     namespace["rest"].should eq(["ignored", "y"] of Argparse::Value)
   end
 end
+
+describe "type converters" do
+  it "accepts a Proc as type" do
+    doubler = ->(value : String) { (value.to_i64 * 2).as(Argparse::Value) }
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--number", type: doubler)
+    parser.parse_args(["--number", "21"]).should eq(values(number: 42_i64))
+  end
+
+  it "reports ArgumentTypeError messages from a converter" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--number") do |value|
+      raise Argparse::ArgumentTypeError.new("not a lucky number: #{value}") if value == "13"
+      value.as(Argparse::Value)
+    end
+    expect_raises(Argparse::ArgumentError, "argument --number: not a lucky number: 13") do
+      parser.parse_args(["--number", "13"])
+    end
+  end
+
+  it "opens files with FileType" do
+    path = File.join(Dir.tempdir, "argparse-filetype-#{Process.pid}")
+    File.write(path, "contents")
+    begin
+      parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+      parser.add_argument("--input", type: Argparse::FileType.new("r"))
+      namespace = parser.parse_args(["--input", path])
+      file = namespace["input"].as(IO)
+      file.gets_to_end.should eq("contents")
+      file.close
+    ensure
+      File.delete(path) rescue nil
+    end
+  end
+
+  it "reports FileType failures as argument errors" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--input", type: Argparse::FileType.new("r"))
+    expect_raises(Argparse::ArgumentError, /argument --input: can't open/) do
+      parser.parse_args(["--input", "/definitely/not/a/file"])
+    end
+  end
+end

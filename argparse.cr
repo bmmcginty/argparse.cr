@@ -10,7 +10,7 @@ module Argparse
 
   # A value that can be stored in a {Namespace}.  The alias is recursive
   # because `nargs` may nest values, e.g. `append` combined with `nargs: "*"`.
-  alias Value = String | Int64 | Float64 | Bool | Array(Value) | Nil
+  alias Value = String | Int64 | Float64 | Bool | Array(Value) | IO | Nil
 
   # Placeholder for "the caller did not supply this keyword argument".
   class Unset
@@ -66,6 +66,7 @@ module Argparse
     when UInt8, UInt16, UInt32, UInt64 then value.to_i64
     when Float32                       then value.to_f64
     when Float64                       then value
+    when IO                            then value
     when Enum                          then value.to_s
     when Array
       result = Array(Value).new
@@ -121,6 +122,59 @@ module Argparse
   class ConfigurationError < Error
   end
 
+  # Raised by a user supplied type converter to provide the message that is
+  # shown to the command line user.
+  class ArgumentTypeError < Error
+  end
+
+  # Deprecated CPython-compatible factory for opening files in argument types.
+  # The special name "-" maps to standard input or output according to mode.
+  class FileType
+    getter mode : String
+    getter bufsize : Int32
+    getter encoding : String?
+    getter errors : String?
+
+    def initialize(@mode : String = "r", @bufsize : Int32 = -1,
+                   @encoding : String? = nil, @errors : String? = nil)
+    end
+
+    def call(string : String) : Value
+      if string == "-"
+        if @mode.includes?('r')
+          return STDIN
+        elsif @mode.each_char.any? { |char| "wax".includes?(char) }
+          return STDOUT
+        else
+          raise ArgumentTypeError.new("argument \"-\" with mode #{@mode.inspect}")
+        end
+      end
+      if (@mode.includes?('x')) && File.exists?(string)
+        raise ArgumentTypeError.new("can't open '#{string}': file exists")
+      end
+      open_mode = if @mode.includes?('a')
+                    "a"
+                  elsif @mode.includes?('w') || @mode.includes?('x')
+                    "w"
+                  else
+                    "r"
+                  end
+      File.open(string, open_mode)
+    rescue ex : ArgumentTypeError
+      raise ex
+    rescue ex
+      raise ArgumentTypeError.new("can't open '#{string}': #{ex.message}")
+    end
+
+    def to_s(io : IO) : Nil
+      io << "FileType(" << @mode.inspect
+      io << ", " << @bufsize unless @bufsize == -1
+      io << ", encoding: " << @encoding.inspect if @encoding
+      io << ", errors: " << @errors.inspect if @errors
+      io << ')'
+    end
+  end
+
   # Raised while parsing.  When an argument is involved its invocation is
   # prefixed, exactly like CPython's `argparse.ArgumentError`.
   class ArgumentError < Error
@@ -154,6 +208,7 @@ module Argparse
     when Nil   then "None"
     when true  then "True"
     when false then "False"
+    when IO then value.to_s
     when Array(Value)
       "[#{value.map { |item| py_repr(item) }.join(", ")}]"
     else
@@ -307,6 +362,8 @@ module Argparse
       if custom = @converter
         begin
           return custom.call(text)
+        rescue ex : ArgumentTypeError
+          raise ArgumentError.new(ex.message || "invalid value: #{Argparse.py_repr(text)}", name)
         rescue ex : ArgumentError
           raise ex
         rescue ex
@@ -704,7 +761,7 @@ module Argparse
     def add_argument(*args : String, action : String | Nil = nil,
                      nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
-                     type : String | Symbol | Nil = nil,
+                     type : String | Symbol | Proc(String, Value) | FileType | Nil = nil,
                      choices : Object? = nil,
                      required : Bool | Nil = nil,
                      help : String | Suppress | Nil = nil,
@@ -718,7 +775,7 @@ module Argparse
     def add_argument(*args : String, action : String | Nil = nil,
                      nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
-                     type : String | Symbol | Nil = nil,
+                     type : String | Symbol | Proc(String, Value) | FileType | Nil = nil,
                      choices : Object? = nil,
                      required : Bool | Nil = nil,
                      help : String | Suppress | Nil = nil,
@@ -791,7 +848,7 @@ module Argparse
     private def add_argument_impl(names : Array(String), action : String?,
                                   nargs : Int32 | String | Suppress | Nil,
                                   raw_const : Object?, raw_default : Object?,
-                                  raw_type : String | Symbol | Nil,
+                                  raw_type : String | Symbol | Proc(String, Value) | FileType | Nil,
                                   raw_choices : Object?, required : Bool?,
                                   help : String | Suppress | Nil,
                                   metavar : String | Array(String) | Tuple | Suppress | Nil, dest : String | Suppress | Nil?,
@@ -800,7 +857,14 @@ module Argparse
                                   target_group : ArgumentGroup?) : Argument
       const = Argparse.normalize(raw_const)
       default = Argparse.normalize(raw_default)
-      type = raw_type.is_a?(Symbol) ? raw_type.to_s : raw_type
+      type = raw_type.is_a?(String) ? raw_type : (raw_type.is_a?(Symbol) ? raw_type.to_s : nil)
+      effective_converter = if converter
+                              converter
+                            elsif raw_type.is_a?(Proc(String, Value))
+                              raw_type
+                            elsif raw_type.is_a?(FileType)
+                              ->(value : String) : Value { raw_type.call(value) }
+                            end
       choices = Argparse.normalize_choices(raw_choices)
       normalized_metavar = Argparse.normalize_metavar(metavar)
       if normalized_metavar.is_a?(Array(String))
@@ -890,7 +954,7 @@ module Argparse
 
       argument = Argument.new(option_strings, destination, action_name,
         effective_nargs, resolved_const, resolved_default, type, choices,
-        required_flag, help, normalized_metavar, version, converter,
+        required_flag, help, normalized_metavar, version, effective_converter,
         dest_suppressed)
       check_conflicts(argument)
       @actions << argument
@@ -999,7 +1063,7 @@ module Argparse
     def add_argument(names : Array(String), action : String | Nil = nil,
                      nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
-                     type : String | Symbol | Nil = nil,
+                     type : String | Symbol | Proc(String, Value) | FileType | Nil = nil,
                      choices : Object? = nil,
                      required : Bool | Nil = nil,
                      help : String | Suppress | Nil = nil,

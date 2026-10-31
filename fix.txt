@@ -18,9 +18,9 @@ Items are checked off as they are implemented and verified.
 - [x] `argparse.SUPPRESS` for `dest` and `nargs`
 - [ ] `deprecated=` for options, positionals, and subcommands
 - [ ] custom `Action` classes / action registry
-- [ ] callable `type=` values (not only a Crystal block)
-- [ ] `FileType` and file objects in namespaces
-- [ ] `ArgumentTypeError` for user supplied converters
+- [x] callable `type=` values (not only a Crystal block)
+- [x] `FileType` and file objects in namespaces
+- [x] `ArgumentTypeError` for user supplied converters
 - [ ] public action/nargs constants (`OPTIONAL`, `ZERO_OR_MORE`, `ONE_OR_MORE`, `PARSER`, `REMAINDER`, `SUPPRESS`) and `BooleanOptionalAction`
 
 ## Parsing
