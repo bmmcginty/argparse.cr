@@ -1,0 +1,44 @@
+# Feature parity with Python argparse
+
+Items are checked off as they are implemented and verified.
+
+## Parser construction and argument containers
+
+- [ ] `parents=` parser inheritance, including parent argument groups and mutually exclusive groups
+- [ ] `add_argument_group(title:, description:)` and group help layout
+- [ ] `add_mutually_exclusive_group` inside an argument group
+- [ ] `conflict_handler: "error" | "resolve"`
+- [ ] `formatter_class:` and the built-in formatters (`HelpFormatter`, `RawDescriptionHelpFormatter`, `RawTextHelpFormatter`, `ArgumentDefaultsHelpFormatter`, `MetavarTypeHelpFormatter`)
+- [ ] custom `HelpFormatter` subclasses
+
+## Arguments and actions
+
+- [ ] `add_subparsers` with `dest`, `required`, `help`, `metavar`, `title`, `description`, `prog`, aliases, custom parser classes, nested subparsers, and subcommand help
+- [ ] tuple `metavar` values, including validation against `nargs`
+- [ ] `argparse.SUPPRESS` for `dest` and `nargs`
+- [ ] `deprecated=` for options, positionals, and subcommands
+- [ ] custom `Action` classes / action registry
+- [ ] callable `type=` values (not only a Crystal block)
+- [ ] `FileType` and file objects in namespaces
+- [ ] `ArgumentTypeError` for user supplied converters
+- [ ] public action/nargs constants (`OPTIONAL`, `ZERO_OR_MORE`, `ONE_OR_MORE`, `PARSER`, `REMAINDER`, `SUPPRESS`) and `BooleanOptionalAction`
+
+## Parsing
+
+- [ ] `namespace=` argument for `parse_args` and `parse_known_args`
+- [ ] `parse_intermixed_args` and `parse_known_intermixed_args`
+- [ ] `fromfile_prefix_chars=` and `convert_arg_line_to_args`
+- [ ] `suggest_on_error=` "did you mean" hints for choices and subcommands
+
+## Messages and output
+
+- [ ] `suggest_on_error` wording matches CPython
+- [ ] message translation hook (gettext-style)
+- [ ] `parser.exit(status, message)` and `ArgumentParser.print_message` extension points
+- [ ] help rendering for suppressed groups, raw text, defaults, and metavar-type formatters
+
+## Verification
+
+- [ ] Extend the CPython extractor to cover newly supported parser keywords, actions, and types
+- [ ] Regenerate the conformance fixtures
+- [ ] Update README with the new supported API and remaining (language-inherent) limits
