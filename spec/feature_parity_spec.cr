@@ -250,3 +250,119 @@ describe "parse namespace" do
     result.should eq(values(foo: "new", bar: "value", extra: 1_i64))
   end
 end
+
+describe "formatter classes" do
+  it "adds defaults with ArgumentDefaultsHelpFormatter" do
+    parser = Argparse::ArgumentParser.new(
+      prog: "PROG", description: "description",
+      formatter_class: Argparse::ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--foo", help: "foo help - oh and by the way, %(default)s")
+    parser.add_argument("--bar", action: "store_true", help: "bar help")
+    parser.add_argument("--quux", help: "Set the quux", default: 42_i64)
+    parser.add_argument("spam", help: "spam help")
+    parser.add_argument("badger", nargs: "?", default: "wooden", help: "badger help")
+    parser.format_help.should eq(
+      "usage: PROG [-h] [--foo FOO] [--bar] [--quux QUUX] spam [badger]\n" \
+      "\n" \
+      "description\n" \
+      "\n" \
+      "positional arguments:\n" \
+      "  spam         spam help\n" \
+      "  badger       badger help (default: wooden)\n" \
+      "\n" \
+      "options:\n" \
+      "  -h, --help   show this help message and exit\n" \
+      "  --foo FOO    foo help - oh and by the way, None\n" \
+      "  --bar        bar help (default: False)\n" \
+      "  --quux QUUX  Set the quux (default: 42)\n")
+  end
+
+  it "uses type names with MetavarTypeHelpFormatter" do
+    parser = Argparse::ArgumentParser.new(
+      prog: "PROG", description: "description",
+      formatter_class: Argparse::MetavarTypeHelpFormatter)
+    parser.add_argument("a", type: "int")
+    parser.add_argument("-b", type: "str")
+    parser.add_argument("-c", type: "float", metavar: "SOME FLOAT")
+    parser.format_usage.should eq("usage: PROG [-h] [-b str] [-c SOME FLOAT] int\n")
+  end
+
+  it "preserves raw descriptions but not raw help text" do
+    parser = Argparse::ArgumentParser.new(
+      prog: "PROG", formatter_class: Argparse::RawDescriptionHelpFormatter,
+      description: "Keep the formatting\n    exactly as it is written\n\nhere\n")
+    parser.add_argument("--foo", help: "  foo help should not\n    retain this odd formatting")
+    parser.add_argument("spam", help: "spam help")
+    parser.format_help.should eq(
+      "usage: PROG [-h] [--foo FOO] spam\n" \
+      "\n" \
+      "Keep the formatting\n" \
+      "    exactly as it is written\n" \
+      "\n" \
+      "here\n" \
+      "\n" \
+      "positional arguments:\n" \
+      "  spam        spam help\n" \
+      "\n" \
+      "options:\n" \
+      "  -h, --help  show this help message and exit\n" \
+      "  --foo FOO   foo help should not retain this odd formatting\n")
+  end
+
+  it "accepts a formatter factory" do
+    factory = ->(prog : String) { Argparse::HelpFormatter.new(prog, indent_increment: 5) }
+    parser = Argparse::ArgumentParser.new(
+      prog: "PROG", prefix_chars: "-+", formatter_class: factory)
+    parser.add_argument("+f", "++foo", help: "foo help")
+    parser.add_argument("spam", help: "spam help")
+    parser.format_help.should eq(
+      "usage: PROG [-h] [+f FOO] spam\n" \
+      "\n" \
+      "positional arguments:\n" \
+      "     spam           spam help\n" \
+      "\n" \
+      "options:\n" \
+      "     -h, --help     show this help message and exit\n" \
+      "     +f, ++foo FOO  foo help\n")
+  end
+end
+
+describe "tuple metavars and suppressed arguments" do
+  it "formats tuple metavars for optionals and positionals" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG")
+    parser.add_argument("-w", help: "w", nargs: "+", metavar: {"W1", "W2"})
+    parser.add_argument("-x", help: "x", nargs: "*", metavar: {"X1", "X2"})
+    parser.add_argument("-y", help: "y", nargs: 3, metavar: {"Y1", "Y2", "Y3"})
+    parser.add_argument("-z", help: "z", nargs: "?", metavar: {"Z1"})
+    parser.format_usage.should eq(
+      "usage: PROG [-h] [-w W1 [W2 ...]] [-x [X1 [X2 ...]]] [-y Y1 Y2 Y3] [-z [Z1]]\n")
+
+    parser = Argparse::ArgumentParser.new(prog: "PROG")
+    parser.add_argument("w", help: "w help", nargs: "+", metavar: {"W1", "W2"})
+    parser.add_argument("x", help: "x help", nargs: "*", metavar: {"X1", "X2"})
+    parser.add_argument("y", help: "y help", nargs: 3, metavar: {"Y1", "Y2", "Y3"})
+    parser.add_argument("z", help: "z help", nargs: "?", metavar: {"Z1"})
+    parser.format_usage.should eq(
+      "usage: PROG [-h] W1 [W2 ...] [X1 [X2 ...]] Y1 Y2 Y3 [Z1]\n")
+    parser.format_help.should contain("  W1 W2       w help\n")
+    parser.format_help.should contain("  Y1 Y2 Y3    y help\n")
+  end
+
+  it "rejects tuple metavars that do not match nargs" do
+    parser = Argparse::ArgumentParser.new
+    expect_raises(Argparse::ConfigurationError, "length of metavar tuple does not match nargs") do
+      parser.add_argument("-x", nargs: 3, metavar: {"A", "B"})
+    end
+  end
+
+  it "can suppress destinations and argument consumption" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--foo", dest: Argparse::SUPPRESS)
+    parser.add_argument("--bar", nargs: Argparse::SUPPRESS)
+    parser.add_argument("rest", nargs: "*")
+    namespace = parser.parse_args(["--foo", "x", "--bar", "ignored", "y"])
+    namespace.has_key?("foo").should be_false
+    namespace["bar"].should be_nil
+    namespace["rest"].should eq(["ignored", "y"] of Argparse::Value)
+  end
+end

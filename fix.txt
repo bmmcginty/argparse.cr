@@ -8,14 +8,14 @@ Items are checked off as they are implemented and verified.
 - [x] `add_argument_group(title:, description:)` and group help layout
 - [x] `add_mutually_exclusive_group` inside an argument group
 - [x] `conflict_handler: "error" | "resolve"`
-- [ ] `formatter_class:` and the built-in formatters (`HelpFormatter`, `RawDescriptionHelpFormatter`, `RawTextHelpFormatter`, `ArgumentDefaultsHelpFormatter`, `MetavarTypeHelpFormatter`)
-- [ ] custom `HelpFormatter` subclasses
+- [x] `formatter_class:` and the built-in formatters (`HelpFormatter`, `RawDescriptionHelpFormatter`, `RawTextHelpFormatter`, `ArgumentDefaultsHelpFormatter`, `MetavarTypeHelpFormatter`)
+- [x] custom `HelpFormatter` subclasses
 
 ## Arguments and actions
 
 - [x] `add_subparsers` with `dest`, `required`, `help`, `metavar`, `title`, `description`, `prog`, aliases, custom parser classes, nested subparsers, and subcommand help
-- [ ] tuple `metavar` values, including validation against `nargs`
-- [ ] `argparse.SUPPRESS` for `dest` and `nargs`
+- [x] tuple `metavar` values, including validation against `nargs`
+- [x] `argparse.SUPPRESS` for `dest` and `nargs`
 - [ ] `deprecated=` for options, positionals, and subcommands
 - [ ] custom `Action` classes / action registry
 - [ ] callable `type=` values (not only a Crystal block)
@@ -35,7 +35,7 @@ Items are checked off as they are implemented and verified.
 - [ ] `suggest_on_error` wording matches CPython
 - [ ] message translation hook (gettext-style)
 - [ ] `parser.exit(status, message)` and `ArgumentParser.print_message` extension points
-- [ ] help rendering for suppressed groups, raw text, defaults, and metavar-type formatters
+- [x] help rendering for suppressed groups, raw text, defaults, and metavar-type formatters
 
 ## Verification
 

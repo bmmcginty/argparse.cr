@@ -42,6 +42,10 @@ module Argparse
   # Values accepted by `const:`, `default:` and `argument_default:`.
   alias Spec = Value | Unset | Suppress
 
+  # A metavar may be a single name or one name per argument for tuple-style
+  # nargs formatting.
+  alias Metavar = String | Array(String) | Suppress
+
   # Normalises a value supplied through the public API into a {Spec}.
   def self.normalize(value : Object?) : Spec
     case value
@@ -77,6 +81,22 @@ module Argparse
       result
     else
       raise ConfigurationError.new("unsupported value: #{value.inspect}")
+    end
+  end
+
+  # Normalises a metavar supplied as a string, array, or tuple.
+  def self.normalize_metavar(value : String | Array(String) | Tuple | Suppress | Nil) : Metavar?
+    case value
+    when Nil      then nil
+    when Suppress then SUPPRESS
+    when String   then value
+    when Array    then value.map(&.to_s)
+    when Tuple
+      result = Array(String).new
+      value.each { |item| result << item.to_s }
+      result
+    else
+      raise ConfigurationError.new("unsupported metavar: #{value.inspect}")
     end
   end
 
@@ -234,24 +254,24 @@ module Argparse
     getter option_strings : Array(String)
     getter dest : String
     getter action : String
-    getter nargs : Nil | Int32 | String
+    getter nargs : Nil | Int32 | String | Suppress
     getter const : Spec
     property default : Spec
     getter type_name : String?
     getter choices : Array(Value)?
     property required : Bool
     getter help : String? | Suppress
-    getter metavar : String?
+    getter metavar : Metavar?
     getter version : String?
     getter converter : Proc(String, Value)?
     property dest_suppressed : Bool
     property subparsers : SubparsersAction?
 
     def initialize(@option_strings : Array(String), @dest : String,
-                   @action : String, @nargs : Nil | Int32 | String,
+                   @action : String, @nargs : Nil | Int32 | String | Suppress,
                    @const : Spec, @default : Spec, @type_name : String?,
                    @choices : Array(Value)?, @required : Bool,
-                   @help : String? | Suppress, @metavar : String?,
+                   @help : String? | Suppress, @metavar : Metavar?,
                    @version : String?,
                    @converter : Proc(String, Value)? = nil,
                    @dest_suppressed : Bool = false,
@@ -267,10 +287,13 @@ module Argparse
     def name : String
       return @option_strings.join('/') if option?
       if subparsers = @subparsers
-        return @metavar || "{#{subparsers.choices_names.join(',')}}"
+        return "{#{subparsers.choices_names.join(',')}}"
       end
-      if metavar = @metavar
+      case metavar = @metavar
+      when String
         return metavar
+      when Array(String)
+        return metavar.join(", ")
       end
       return @dest unless @dest_suppressed
       if choices = @choices
@@ -331,6 +354,125 @@ module Argparse
       else
         raise ArgumentError.new("invalid float value: #{Argparse.py_repr(text)}")
       end
+    end
+  end
+
+  # Base help formatter.  The public hook points mirror the parts of Python's
+  # HelpFormatter that affect rendered plain-text output.  Custom subclasses
+  # can override `fill_text`, `split_lines`, `help_string`, or the default
+  # metavar methods.
+  class HelpFormatter
+    getter prog : String
+    getter indent_increment : Int32
+    getter max_help_position : Int32
+    getter width : Int32
+
+    def initialize(@prog : String, @indent_increment : Int32 = 2,
+                   @max_help_position : Int32 = 24, @width : Int32 = 78)
+    end
+
+    def fill_text(text : String, width : Int32, indent : String) : String
+      normalized = HelpFormatter.normalize_whitespace(text)
+      return "" if normalized.empty?
+      lines = HelpFormatter.wrap_words(normalized, Math.max(width - indent.size, 1))
+      String.build do |io|
+        lines.each_with_index do |line, index|
+          io << '\n' unless index.zero?
+          io << indent << line
+        end
+      end
+    end
+
+    def split_lines(text : String, width : Int32) : Array(String)
+      normalized = HelpFormatter.normalize_whitespace(text)
+      return [""] if normalized.empty?
+      HelpFormatter.wrap_words(normalized, Math.max(width, 1))
+    end
+
+    def help_string(argument : Argument) : String?
+      help = argument.help
+      help.is_a?(String) ? help : nil
+    end
+
+    def default_metavar_optional(argument : Argument) : String
+      argument.dest.upcase
+    end
+
+    def default_metavar_positional(argument : Argument) : String
+      argument.dest
+    end
+
+    def self.normalize_whitespace(text : String) : String
+      text.split(/\s+/).reject(&.empty?).join(' ')
+    end
+
+    def self.wrap_words(text : String, width : Int32) : Array(String)
+      words = text.split(/\s+/).reject(&.empty?)
+      return [""] if words.empty?
+      lines = [] of String
+      current = ""
+      words.each do |word|
+        if current.empty?
+          current = word
+        elsif current.size + 1 + word.size <= width
+          current = "#{current} #{word}"
+        else
+          lines << current
+          current = word
+        end
+        while current.size > width
+          lines << current[0, width]
+          current = current[width..]
+        end
+      end
+      lines << current unless current.empty?
+      lines
+    end
+  end
+
+  # Keeps line breaks in descriptions and epilogs, but still wraps action help.
+  class RawDescriptionHelpFormatter < HelpFormatter
+    def fill_text(text : String, width : Int32, indent : String) : String
+      lines = text.split('\n', remove_empty: false)
+      lines.pop if lines.last? == ""
+      String.build do |io|
+        lines.each_with_index do |line, index|
+          io << '\n' unless index.zero?
+          io << indent << line
+        end
+      end
+    end
+  end
+
+  # Keeps line breaks and spacing in descriptions, epilogs, and action help.
+  class RawTextHelpFormatter < RawDescriptionHelpFormatter
+    def split_lines(text : String, width : Int32) : Array(String)
+      text.split('\n', remove_empty: false)
+    end
+  end
+
+  # Adds "(default: ...)" to help strings that do not mention %(default)s.
+  class ArgumentDefaultsHelpFormatter < HelpFormatter
+    def help_string(argument : Argument) : String?
+      help = argument.help
+      help = "" unless help.is_a?(String)
+      unless help.includes?("%(default)") || argument.default.is_a?(Suppress) || argument.required
+        if argument.option? || argument.nargs == "?" || argument.nargs == "*"
+          help += " (default: %(default)s)"
+        end
+      end
+      help
+    end
+  end
+
+  # Uses the declared type name as the default metavar.
+  class MetavarTypeHelpFormatter < HelpFormatter
+    def default_metavar_optional(argument : Argument) : String
+      argument.type_name || "None"
+    end
+
+    def default_metavar_positional(argument : Argument) : String
+      argument.type_name || "None"
     end
   end
 
@@ -506,6 +648,7 @@ module Argparse
     # Width of the formatter, like Python's `HelpFormatter` width (the
     # terminal width minus two columns).
     getter width : Int32
+    getter formatter : HelpFormatter
     property exit_on_error : Bool
 
     NEGATIVE_NUMBER = /\A-\.?\d/
@@ -529,8 +672,14 @@ module Argparse
                    @argument_default : Spec = UNSET,
                    conflict_handler : String = "error",
                    @exit_on_error : Bool = true,
-                   @width : Int32 = 78)
+                   @width : Int32 = 78,
+                   formatter_class : HelpFormatter.class | Proc(String, HelpFormatter) = HelpFormatter)
       @prog = prog || File.basename(PROGRAM_NAME)
+      @formatter = if formatter_class.is_a?(Proc)
+                     formatter_class.call(@prog)
+                   else
+                     formatter_class.new(@prog, width: @width)
+                   end
       @conflict_handler = conflict_handler
       @argument_groups = [] of ArgumentGroup
       unless conflict_handler == "error" || conflict_handler == "resolve"
@@ -553,28 +702,28 @@ module Argparse
     # ---------------------------------------------------------------
 
     def add_argument(*args : String, action : String | Nil = nil,
-                     nargs : Int32 | String | Nil = nil,
+                     nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
                      type : String | Symbol | Nil = nil,
                      choices : Object? = nil,
                      required : Bool | Nil = nil,
                      help : String | Suppress | Nil = nil,
-                     metavar : String | Nil = nil,
-                     dest : String | Nil = nil,
+                     metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
+                     dest : String | Suppress | Nil = nil,
                      version : String | Nil = nil) : Argument
       add_argument_impl(args.to_a, action, nargs, const, default, type,
         choices, required, help, metavar, dest, version, nil, nil)
     end
 
     def add_argument(*args : String, action : String | Nil = nil,
-                     nargs : Int32 | String | Nil = nil,
+                     nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
                      type : String | Symbol | Nil = nil,
                      choices : Object? = nil,
                      required : Bool | Nil = nil,
                      help : String | Suppress | Nil = nil,
-                     metavar : String | Nil = nil,
-                     dest : String | Nil = nil,
+                     metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
+                     dest : String | Suppress | Nil = nil,
                      version : String | Nil = nil,
                      &converter : String -> Value) : Argument
       add_argument_impl(args.to_a, action, nargs, const, default, type,
@@ -640,12 +789,12 @@ module Argparse
     end
 
     private def add_argument_impl(names : Array(String), action : String?,
-                                  nargs : Int32 | String | Nil,
+                                  nargs : Int32 | String | Suppress | Nil,
                                   raw_const : Object?, raw_default : Object?,
                                   raw_type : String | Symbol | Nil,
                                   raw_choices : Object?, required : Bool?,
                                   help : String | Suppress | Nil,
-                                  metavar : String?, dest : String?,
+                                  metavar : String | Array(String) | Tuple | Suppress | Nil, dest : String | Suppress | Nil?,
                                   version : String?,
                                   converter : Proc(String, Value)?,
                                   target_group : ArgumentGroup?) : Argument
@@ -653,14 +802,36 @@ module Argparse
       default = Argparse.normalize(raw_default)
       type = raw_type.is_a?(Symbol) ? raw_type.to_s : raw_type
       choices = Argparse.normalize_choices(raw_choices)
+      normalized_metavar = Argparse.normalize_metavar(metavar)
+      if normalized_metavar.is_a?(Array(String))
+        length = normalized_metavar.size
+        valid = case nargs
+                when Int32 then length == nargs
+                when "+"   then length == 2
+                when "*"   then length == 1 || length == 2
+                when "?"   then length == 1
+                when nil   then length == 1
+                else            true
+                end
+        unless valid
+          raise ConfigurationError.new("length of metavar tuple does not match nargs")
+        end
+      end
       raise ConfigurationError.new("add_argument requires at least one name") if names.empty?
 
       uses_prefix = names.any? { |name| has_prefix?(name) }
+      dest_suppressed = dest.is_a?(Suppress)
       if uses_prefix
         unless names.all? { |name| has_prefix?(name) }
           raise ConfigurationError.new("invalid option string #{names.find { |name| !has_prefix?(name) }.inspect}: must start with one of #{@prefix_chars.inspect}")
         end
-        destination = dest || infer_optional_dest(names)
+        destination = if dest.is_a?(String)
+                        dest
+                      elsif dest_suppressed
+                        "__suppressed__"
+                      else
+                        infer_optional_dest(names)
+                      end
         option_strings = names
       else
         if names.size > 1
@@ -703,7 +874,7 @@ module Argparse
       required_flag = if action_name == "parsers"
                         required || false
                       elsif required.nil?
-                        option_strings.empty? && !(nargs == "?" || nargs == "*")
+                        option_strings.empty? && !(nargs == "?" || nargs == "*" || nargs.is_a?(Suppress))
                       else
                         required.as(Bool)
                       end
@@ -719,7 +890,8 @@ module Argparse
 
       argument = Argument.new(option_strings, destination, action_name,
         effective_nargs, resolved_const, resolved_default, type, choices,
-        required_flag, help, metavar, version, converter)
+        required_flag, help, normalized_metavar, version, converter,
+        dest_suppressed)
       check_conflicts(argument)
       @actions << argument
       group = target_group || (option_strings.empty? ? @positionals_group.not_nil! : @optionals_group.not_nil!)
@@ -751,7 +923,7 @@ module Argparse
       inferred
     end
 
-    private def check_nargs(nargs : Int32 | String | Nil) : Nil
+    private def check_nargs(nargs : Int32 | String | Suppress | Nil) : Nil
       case nargs
       when String
         unless NARGS_NAMES.includes?(nargs)
@@ -759,10 +931,12 @@ module Argparse
         end
       when Int32
         raise ConfigurationError.new("invalid nargs value #{nargs}") if nargs < 0
+      when Suppress
+        # SUPPRESS consumes no arguments and stores nothing.
       end
     end
 
-    private def check_action_kwargs(action : String, nargs : Int32 | String | Nil, const : Spec) : Nil
+    private def check_action_kwargs(action : String, nargs : Int32 | String | Suppress | Nil, const : Spec) : Nil
       case action
       when "store", "append", "extend"
         if nargs == 0
@@ -783,7 +957,7 @@ module Argparse
     end
 
     private def resolve_default(action : String, default : Spec,
-                                positional : Bool, nargs : Int32 | String | Nil) : Spec
+                                positional : Bool, nargs : Int32 | String | Suppress | Nil) : Spec
       return default unless default.is_a?(Unset)
       return @argument_default unless @argument_default.is_a?(Unset)
       return [] of Value if positional && nargs == "*"
@@ -823,14 +997,14 @@ module Argparse
 
     # Overload used when argument names are only known at runtime.
     def add_argument(names : Array(String), action : String | Nil = nil,
-                     nargs : Int32 | String | Nil = nil,
+                     nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
                      type : String | Symbol | Nil = nil,
                      choices : Object? = nil,
                      required : Bool | Nil = nil,
                      help : String | Suppress | Nil = nil,
-                     metavar : String | Nil = nil,
-                     dest : String | Nil = nil,
+                     metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
+                     dest : String | Suppress | Nil = nil,
                      version : String | Nil = nil) : Argument
       add_argument_impl(names, action, nargs, const, default, type,
         choices, required, help, metavar, dest, version, nil, nil)
@@ -902,7 +1076,7 @@ module Argparse
     def add_subparsers(required : Bool = false,
                        dest : String | Suppress | Nil = SUPPRESS,
                        help : String | Suppress | Nil = nil,
-                       metavar : String | Nil = nil,
+                       metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
                        title : String | Suppress | Nil = nil,
                        description : String | Suppress | Nil = nil,
                        prog : String? = nil,
@@ -1414,6 +1588,8 @@ module Argparse
         option ? "([AO]*)" : "(.*)"
       when "A..."
         option ? "(A[AO]*)" : "(-*A[-AO]*)"
+      when Suppress
+        option ? "()" : "(-*)"
       else
         count = nargs.as(Int32)
         option ? "([AO]{#{count}})" : "((?:-*A){#{count}}-*)"
@@ -1471,6 +1647,8 @@ module Argparse
         value
       elsif action.nargs == "..."
         convert_all(action, arg_strings)
+      elsif action.nargs.is_a?(Suppress)
+        SUPPRESS
       else
         values = convert_all(action, arg_strings)
         values.each { |value| check_value(action, value) }
@@ -1630,12 +1808,14 @@ module Argparse
       buffer = String.build do |io|
         io << usage_block
         if text = @description
-          io << expand_text(text) << "\n\n"
+          rendered = @formatter.fill_text(expand_text(text), @formatter.width, "")
+          io << rendered << "\n\n" unless rendered.empty?
         end
         column = help_column
         @argument_groups.each { |group| write_group(io, group, column) }
         if text = @epilog
-          io << expand_text(text) << "\n\n"
+          rendered = @formatter.fill_text(expand_text(text), @formatter.width, "")
+          io << rendered << "\n\n" unless rendered.empty?
         end
       end
       buffer.rstrip('\n') + "\n"
@@ -1670,12 +1850,12 @@ module Argparse
       parts, positionals_start = usage_parts(actions)
       usage = ([@prog] + parts).join(' ')
       prefix = "usage: "
-      return usage if prefix.size + usage.size <= @width
+      return usage if prefix.size + usage.size <= @formatter.width
 
       optionals = parts[0, positionals_start]
       positionals = parts[positionals_start..]? || [] of String
       lines = [] of String
-      if prefix.size + @prog.size <= 0.75 * @width
+      if prefix.size + @prog.size <= 0.75 * @formatter.width
         indent = " " * (prefix.size + @prog.size + 1)
         if !optionals.empty?
           lines = wrap_usage_parts([@prog] + optionals, indent, prefix)
@@ -1706,7 +1886,7 @@ module Argparse
       indent_length = indent.size
       line_length = first_prefix ? first_prefix.size - 1 : indent_length - 1
       parts.each do |part|
-        if line_length + 1 + part.size > @width && !line.empty?
+        if line_length + 1 + part.size > @formatter.width && !line.empty?
           lines << indent + line.join(' ')
           line = [] of String
           line_length = indent_length - 1
@@ -1808,44 +1988,68 @@ module Argparse
     end
 
     private def args_usage(argument : Argument) : String
-      metavar = metavar_for(argument)
+      parts = metavar_parts(argument)
       case nargs = argument.nargs
-      when nil   then metavar
-      when "?"   then "[#{metavar}]"
-      when "*"   then "[#{metavar} ...]"
-      when "+"   then "#{metavar} [#{metavar} ...]"
-      when "..." then "..."
-      when "A..." then "#{metavar} ..."
-      else            Array.new(nargs.as(Int32), metavar).join(' ')
+      when nil
+        parts[0]
+      when "?"
+        "[#{parts[0]}]"
+      when "*"
+        if parts.size == 2
+          "[#{parts[0]} [#{parts[1]} ...]]"
+        else
+          "[#{parts[0]} ...]"
+        end
+      when "+"
+        "#{parts[0]} [#{parts[1]? || parts[0]} ...]"
+      when "..."
+        "..."
+      when "A..."
+        "#{parts[0]} ..."
+      when Suppress
+        ""
+      else
+        count = nargs.as(Int32)
+        Array.new(count) { |index| parts[index]? || parts[0] }.join(' ')
       end
     end
 
-    private def metavar_for(argument : Argument) : String
-      if metavar = argument.metavar
+    private def metavar_parts(argument : Argument) : Array(String)
+      case metavar = argument.metavar
+      when Array(String)
         return metavar
+      when String
+        return [metavar]
+      when Suppress
+        return [""]
       end
       if subparsers = argument.subparsers
-        return "{#{subparsers.choices_names.join(',')}}"
+        return ["{#{subparsers.choices_names.join(',')}}"]
       end
       if choices = argument.choices
-        return "{#{choices.map { |choice| Argparse.py_str(choice) }.join(',')}}"
+        return ["{#{choices.map { |choice| Argparse.py_str(choice) }.join(',')}}"]
       end
-      argument.option? ? argument.dest.upcase : argument.dest
+      if argument.option?
+        [@formatter.default_metavar_optional(argument)]
+      else
+        [@formatter.default_metavar_positional(argument)]
+      end
     end
 
     private def help_column : Int32
       longest = 0
       @actions.each do |argument|
         next if argument.help.is_a?(Suppress)
-        size = invocation(argument).size + INDENT
+        size = invocation(argument).size + @formatter.indent_increment
         longest = size if size > longest
       end
-      max_help_position = Math.min(MAX_HELP_POSITION, Math.max(@width - 20, INDENT * 2))
-      Math.min(longest + INDENT, max_help_position)
+      max_help_position = Math.min(@formatter.max_help_position,
+        Math.max(@formatter.width - 20, @formatter.indent_increment * 2))
+      Math.min(longest + 2, max_help_position)
     end
 
     private def invocation(argument : Argument) : String
-      return metavar_for(argument) unless argument.option?
+      return metavar_parts(argument).join(' ') unless argument.option?
       names = argument.option_strings.join(", ")
       return names if argument.nargs == 0
       "#{names} #{args_usage(argument)}"
@@ -1860,7 +2064,9 @@ module Argparse
       end
       description = group.description
       if description && !description.is_a?(Suppress)
-        io << " " * INDENT << expand_text(description) << "\n\n"
+        rendered = @formatter.fill_text(expand_text(description), @formatter.width,
+          " " * @formatter.indent_increment)
+        io << rendered << "\n\n" unless rendered.empty?
       end
       write_actions(io, visible, column)
     end
@@ -1868,10 +2074,10 @@ module Argparse
     private def write_actions(io : IO, arguments : Array(Argument),
                               column : Int32) : Nil
       arguments.each do |argument|
-        write_action(io, argument, column, INDENT)
+        write_action(io, argument, column, @formatter.indent_increment)
         if subparsers = argument.subparsers
           subparsers.choices_actions.each do |choice|
-            write_action(io, choice, column, INDENT * 2)
+            write_action(io, choice, column, @formatter.indent_increment * 2)
           end
         end
       end
@@ -1881,11 +2087,11 @@ module Argparse
     private def write_action(io : IO, argument : Argument, column : Int32,
                              indent : Int32) : Nil
       action_width = column - indent - 2
-      help_width = Math.max(@width - column, 11)
+      help_width = Math.max(@formatter.width - column, 11)
       header = invocation(argument)
       io << " " * indent
-      help_text = argument.help
-      if help_text.nil? || help_text.is_a?(Suppress)
+      help_text = @formatter.help_string(argument)
+      if help_text.nil?
         io << header << '\n'
         return
       end
@@ -1903,7 +2109,7 @@ module Argparse
         io << '\n'
         return
       end
-      lines = wrap_text(expanded, help_width)
+      lines = @formatter.split_lines(expanded, help_width)
       io << " " * first_line_column << lines.first << '\n'
       lines[1..].each { |line| io << " " * column << line << '\n' }
     end
@@ -1947,7 +2153,12 @@ module Argparse
       when "prog"    then @prog
       when "dest"    then argument.dest
       when "type"    then argument.type_name
-      when "metavar" then argument.metavar
+      when "metavar"
+        case metavar = argument.metavar
+        when String   then metavar
+        when Array(String) then metavar.join(", ")
+        else               nil
+        end
       when "choices" then argument.choices.try { |choices| choices.map { |choice| Argparse.py_str(choice) }.join(", ") }
       when "const"   then argument.const.is_a?(Suppress) ? nil : Argparse.py_str(unwrap(argument.const))
       when "default" then argument.default.is_a?(Suppress) ? nil : Argparse.py_str(unwrap(argument.default))
