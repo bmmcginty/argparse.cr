@@ -114,6 +114,54 @@ module Argparse
     end
   end
 
+  # Returns the closest choice for a mistyped string, using the same 0.6
+  # cutoff as Python's difflib.get_close_matches.
+  def self.closest_match(value : String, choices : Array(String)) : String?
+    best : String? = nil
+    best_ratio = 0.6
+    choices.each do |choice|
+      longest = Math.max(value.size, choice.size)
+      next if longest.zero?
+      distance = levenshtein(value, choice)
+      ratio = 1.0 - distance.to_f / longest
+      if ratio > best_ratio
+        best_ratio = ratio
+        best = choice
+      end
+    end
+    best
+  end
+
+  private def self.levenshtein(left : String, right : String) : Int32
+    previous = (0..right.size).to_a
+    left.each_char.with_index do |left_char, row|
+      current = [row + 1]
+      right.each_char.with_index do |right_char, column|
+        cost = left_char == right_char ? 0 : 1
+        current << Math.min(Math.min(current[column] + 1, previous[column + 1] + 1),
+          previous[column] + cost)
+      end
+      previous = current
+    end
+    previous[right.size]
+  end
+
+  # Optional gettext-style translation hook.  Assign a Proc that receives an
+  # English message and returns the translated message.
+  @@translator : Proc(String, String)? = nil
+
+  def self.translator : Proc(String, String)?
+    @@translator
+  end
+
+  def self.translator=(translator : Proc(String, String)?) : Proc(String, String)?
+    @@translator = translator
+  end
+
+  def self.translate(message : String) : String
+    @@translator.try(&.call(message)) || message
+  end
+
   class Error < Exception
   end
 
@@ -321,6 +369,7 @@ module Argparse
     getter converter : Proc(String, Value)?
     property dest_suppressed : Bool
     property subparsers : SubparsersAction?
+    getter deprecated : Bool
 
     def initialize(@option_strings : Array(String), @dest : String,
                    @action : String, @nargs : Nil | Int32 | String | Suppress,
@@ -330,7 +379,8 @@ module Argparse
                    @version : String?,
                    @converter : Proc(String, Value)? = nil,
                    @dest_suppressed : Bool = false,
-                   @subparsers : SubparsersAction? = nil)
+                   @subparsers : SubparsersAction? = nil,
+                   @deprecated : Bool = false)
     end
 
     # True for `-x`/`--foo` style arguments.
@@ -572,6 +622,7 @@ module Argparse
                    conflict_handler : String = "error",
                    add_help : Bool = true, allow_abbrev : Bool = true,
                    exit_on_error : Bool = true,
+                   suggest_on_error : Bool = false,
                    width : Int32 = 78) : ArgumentParser
       if @name_parser_map.has_key?(name)
         raise ConfigurationError.new("conflicting subparser: #{name}")
@@ -589,6 +640,7 @@ module Argparse
         allow_abbrev: allow_abbrev,
         argument_default: Argparse.normalize(argument_default),
         conflict_handler: conflict_handler, exit_on_error: exit_on_error,
+        suggest_on_error: suggest_on_error,
         fromfile_prefix_chars: fromfile_prefix_chars, width: width)
 
       if help
@@ -676,6 +728,7 @@ module Argparse
     property positionals : Array(Argument)
     getter extras = [] of String
     getter extras_pattern = [] of Char
+    getter warned = Set(String).new
     getter seen_actions = Set(Argument).new
     getter seen_non_default = Set(Argument).new
 
@@ -707,6 +760,7 @@ module Argparse
     getter width : Int32
     getter formatter : HelpFormatter
     property exit_on_error : Bool
+    getter suggest_on_error : Bool
 
     NEGATIVE_NUMBER = /\A-\.?\d/
 
@@ -729,6 +783,7 @@ module Argparse
                    @argument_default : Spec = UNSET,
                    conflict_handler : String = "error",
                    @exit_on_error : Bool = true,
+                   @suggest_on_error : Bool = false,
                    @width : Int32 = 78,
                    formatter_class : HelpFormatter.class | Proc(String, HelpFormatter) = HelpFormatter)
       @prog = prog || File.basename(PROGRAM_NAME)
@@ -749,7 +804,7 @@ module Argparse
       if @add_help
         prefix = @prefix_chars.includes?('-') ? '-' : @prefix_chars[0]
         add_argument("#{prefix}h", "#{prefix}#{prefix}help", action: "help",
-          default: SUPPRESS, help: "show this help message and exit")
+          default: SUPPRESS, help: Argparse.translate("show this help message and exit"))
       end
       parents.each { |parent| add_parent(parent) }
     end
@@ -767,9 +822,10 @@ module Argparse
                      help : String | Suppress | Nil = nil,
                      metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
                      dest : String | Suppress | Nil = nil,
-                     version : String | Nil = nil) : Argument
+                     version : String | Nil = nil,
+                     deprecated : Bool = false) : Argument
       add_argument_impl(args.to_a, action, nargs, const, default, type,
-        choices, required, help, metavar, dest, version, nil, nil)
+        choices, required, help, metavar, dest, version, nil, nil, deprecated)
     end
 
     def add_argument(*args : String, action : String | Nil = nil,
@@ -782,9 +838,10 @@ module Argparse
                      metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
                      dest : String | Suppress | Nil = nil,
                      version : String | Nil = nil,
+                     deprecated : Bool = false,
                      &converter : String -> Value) : Argument
       add_argument_impl(args.to_a, action, nargs, const, default, type,
-        choices, required, help, metavar, dest, version, converter, nil)
+        choices, required, help, metavar, dest, version, converter, nil, deprecated)
     end
 
     # :nodoc:
@@ -792,14 +849,15 @@ module Argparse
       add_argument_impl(args.to_a, options[:action]?, options[:nargs]?,
         options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
         options[:choices]?, options[:required]?, options[:help]?,
-        options[:metavar]?, options[:dest]?, options[:version]?, nil, group)
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group,
+        options[:deprecated]? == true)
     end
 
     # :nodoc:
     def add_group_argument(group : ArgumentGroup, *args : String,
                            &converter : String -> Value) : Argument
       add_argument_impl(args.to_a, nil, nil, UNSET, UNSET, nil, nil, nil,
-        nil, nil, nil, nil, converter, group)
+        nil, nil, nil, nil, converter, group, false)
     end
 
     # :nodoc:
@@ -807,7 +865,8 @@ module Argparse
       add_argument_impl(names, options[:action]?, options[:nargs]?,
         options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
         options[:choices]?, options[:required]?, options[:help]?,
-        options[:metavar]?, options[:dest]?, options[:version]?, nil, group)
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group,
+        options[:deprecated]? == true)
     end
 
     # :nodoc:
@@ -815,7 +874,8 @@ module Argparse
       argument = add_argument_impl(args.to_a, options[:action]?, options[:nargs]?,
         options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
         options[:choices]?, options[:required]?, options[:help]?,
-        options[:metavar]?, options[:dest]?, options[:version]?, nil, group.container)
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group.container,
+        options[:deprecated]? == true)
       register_mutex_argument(group, argument)
     end
 
@@ -823,7 +883,7 @@ module Argparse
     def add_mutex_argument(group : MutuallyExclusiveGroup, *args : String,
                            &converter : String -> Value) : Argument
       argument = add_argument_impl(args.to_a, nil, nil, UNSET, UNSET, nil, nil,
-        nil, nil, nil, nil, nil, converter, group.container)
+        nil, nil, nil, nil, nil, converter, group.container, false)
       register_mutex_argument(group, argument)
     end
 
@@ -832,7 +892,8 @@ module Argparse
       argument = add_argument_impl(names, options[:action]?, options[:nargs]?,
         options.fetch(:const, UNSET), options.fetch(:default, UNSET), options[:type]?,
         options[:choices]?, options[:required]?, options[:help]?,
-        options[:metavar]?, options[:dest]?, options[:version]?, nil, group.container)
+        options[:metavar]?, options[:dest]?, options[:version]?, nil, group.container,
+        options[:deprecated]? == true)
       register_mutex_argument(group, argument)
     end
 
@@ -854,7 +915,8 @@ module Argparse
                                   metavar : String | Array(String) | Tuple | Suppress | Nil, dest : String | Suppress | Nil?,
                                   version : String?,
                                   converter : Proc(String, Value)?,
-                                  target_group : ArgumentGroup?) : Argument
+                                  target_group : ArgumentGroup?,
+                                  deprecated : Bool = false) : Argument
       const = Argparse.normalize(raw_const)
       default = Argparse.normalize(raw_default)
       type = raw_type.is_a?(String) ? raw_type : (raw_type.is_a?(Symbol) ? raw_type.to_s : nil)
@@ -955,7 +1017,7 @@ module Argparse
       argument = Argument.new(option_strings, destination, action_name,
         effective_nargs, resolved_const, resolved_default, type, choices,
         required_flag, help, normalized_metavar, version, effective_converter,
-        dest_suppressed)
+        dest_suppressed, nil, deprecated)
       check_conflicts(argument)
       @actions << argument
       group = target_group || (option_strings.empty? ? @positionals_group.not_nil! : @optionals_group.not_nil!)
@@ -1069,9 +1131,10 @@ module Argparse
                      help : String | Suppress | Nil = nil,
                      metavar : String | Array(String) | Tuple | Suppress | Nil = nil,
                      dest : String | Suppress | Nil = nil,
-                     version : String | Nil = nil) : Argument
+                     version : String | Nil = nil,
+                     deprecated : Bool = false) : Argument
       add_argument_impl(names, action, nargs, const, default, type,
-        choices, required, help, metavar, dest, version, nil, nil)
+        choices, required, help, metavar, dest, version, nil, nil, deprecated)
     end
 
     # Adds a named group of arguments.  Groups are rendered as their own help
@@ -1162,7 +1225,7 @@ module Argparse
       end
 
       argument = add_argument_impl([dest_name], "parsers", "A...", UNSET, UNSET,
-        nil, nil, required, help, metavar, nil, nil, nil, target_group)
+        nil, nil, required, help, metavar, nil, nil, nil, target_group, false)
       argument.dest_suppressed = dest.is_a?(Suppress) || dest.nil?
       action = SubparsersAction.new(self, argument, computed_prog, parser_class)
       argument.subparsers = action
@@ -1279,10 +1342,27 @@ module Argparse
       {namespace, extras}
     end
 
+    # Writes a message to an IO without adding a newline, like CPython's
+    # `ArgumentParser._print_message`.
+    def print_message(message : String?, io : IO = STDOUT) : Nil
+      io << message if message
+    end
+
+    # Emits a non-fatal parser warning to stderr.
+    def warning(message : String) : Nil
+      print_message("#{@prog}: warning: #{Argparse.translate(message)}\n", STDERR)
+    end
+
+    # Exits with `status`, optionally printing a message to stderr first.
+    def exit(status : Int32 = 0, message : String? = nil) : NoReturn
+      print_message(message, STDERR)
+      Process.exit(status)
+    end
+
     # Prints usage to stderr and exits with status 2, like CPython.
     def error(message : String) : NoReturn
       STDERR << format_usage
-      STDERR.puts "#{@prog}: error: #{message}"
+      STDERR.puts "#{@prog}: error: #{Argparse.translate(message)}"
       exit(2)
     end
 
@@ -1570,6 +1650,10 @@ module Argparse
       end
 
       action_tuples.each do |taken, args, used_option_string|
+        if taken.deprecated && !run.warned.includes?(used_option_string)
+          warning("option '#{used_option_string}' is deprecated")
+          run.warned << used_option_string
+        end
         take_action(run, taken, args, used_option_string)
       end
       stop
@@ -1595,6 +1679,10 @@ module Argparse
           end
         end
         start_index += arg_count
+        if !args.empty? && action.deprecated && !run.warned.includes?(action.dest)
+          warning("argument '#{action.dest}' is deprecated")
+          run.warned << action.dest
+        end
         take_action(run, action, args, nil)
       end
 
@@ -1711,6 +1799,10 @@ module Argparse
         value
       elsif action.nargs == "..."
         convert_all(action, arg_strings)
+      elsif action.nargs == "A..."
+        values = convert_all(action, arg_strings)
+        check_value(action, values.first) unless values.empty?
+        values
       elsif action.nargs.is_a?(Suppress)
         SUPPRESS
       else
@@ -1727,11 +1819,23 @@ module Argparse
     end
 
     private def check_value(action : Argument, value : Value) : Nil
-      choices = action.choices
+      choices = if subparsers = action.subparsers
+                  subparsers.choices_names.map { |name| name.as(Value) }
+                else
+                  action.choices
+                end
       return if choices.nil?
       return if choices.any? { |choice| choice == value }
       rendered = choices.map { |choice| Argparse.py_repr(choice.to_s) }.join(", ")
-      raise ArgumentError.new("invalid choice: #{Argparse.py_repr(value.to_s)} (choose from #{rendered})", action.name)
+      message = "invalid choice: #{Argparse.py_repr(value.to_s)}"
+      if @suggest_on_error && value.is_a?(String) &&
+         choices.all? { |choice| choice.is_a?(String) }
+        names = choices.map(&.as(String))
+        if closest = Argparse.closest_match(value, names)
+          message += ", maybe you meant #{Argparse.py_repr(closest)}?"
+        end
+      end
+      raise ArgumentError.new("#{message} (choose from #{rendered})", action.name)
     end
 
     # Mirrors `__call__` of CPython's action classes.
@@ -1774,7 +1878,7 @@ module Argparse
           raise ArgumentError.new("unknown parser #{Argparse.py_repr(parser_name)} (choices: #{choices})", action.name)
         end
         if subparsers.deprecated_names.includes?(parser_name)
-          STDERR.puts "#{@prog}: warning: command '#{parser_name}' is deprecated"
+          warning("command '#{parser_name}' is deprecated")
         end
         subnamespace, subextras = subparser.parse_known_args(remaining)
         subnamespace.values.each { |key, value| namespace[key] = value }

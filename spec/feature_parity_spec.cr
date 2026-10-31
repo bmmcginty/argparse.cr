@@ -409,3 +409,70 @@ describe "type converters" do
     end
   end
 end
+
+private class WarningParser < Argparse::ArgumentParser
+  getter warnings = [] of String
+
+  def warning(message : String) : Nil
+    @warnings << message
+  end
+end
+
+describe "deprecated arguments" do
+  it "warns once per deprecated option spelling" do
+    parser = WarningParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("-f", "--foo", deprecated: true)
+    parser.parse_args(["--foo", "spam", "--foo", "ham", "-f", "eggs"])
+    parser.warnings.should eq([
+      "option '--foo' is deprecated",
+      "option '-f' is deprecated",
+    ])
+  end
+
+  it "warns for used deprecated positionals and subcommands" do
+    parser = WarningParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("foo", nargs: "*", deprecated: true)
+    subparsers = parser.add_subparsers(dest: "command")
+    subparsers.add_parser("run", deprecated: true)
+    parser.parse_args(["one", "run"])
+    parser.warnings.should eq([
+      "argument 'foo' is deprecated",
+      "command 'run' is deprecated",
+    ])
+  end
+end
+
+describe "suggestions and translations" do
+  it "suggests the closest choice" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false,
+      suggest_on_error: true)
+    parser.add_argument("foo", choices: ["bar", "baz"])
+    error = expect_raises(Argparse::ArgumentError) { parser.parse_args(["bazz"]) }
+    error.message.should eq(
+      "argument foo: invalid choice: 'bazz', maybe you meant 'baz'? (choose from 'bar', 'baz')")
+  end
+
+  it "suggests the closest subcommand" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false,
+      suggest_on_error: true)
+    subparsers = parser.add_subparsers(required: true)
+    subparsers.add_parser("foo")
+    subparsers.add_parser("bar")
+    error = expect_raises(Argparse::ArgumentError) { parser.parse_args(["baz"]) }
+    error.message.should eq(
+      "argument {foo,bar}: invalid choice: 'baz', maybe you meant 'bar'? (choose from 'foo', 'bar')")
+  end
+
+  it "routes messages through the translation hook" do
+    old = Argparse.translator
+    begin
+      Argparse.translator = ->(message : String) { message.upcase }
+      Argparse.translate("show this help message and exit").should eq(
+        "SHOW THIS HELP MESSAGE AND EXIT")
+      parser = Argparse::ArgumentParser.new(prog: "PROG")
+      parser.format_help.should contain("SHOW THIS HELP MESSAGE AND EXIT")
+    ensure
+      Argparse.translator = old
+    end
+  end
+end
