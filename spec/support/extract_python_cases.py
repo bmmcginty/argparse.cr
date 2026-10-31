@@ -92,6 +92,8 @@ def encode_value(value):
         raise Unsupported(f"integer out of int64 range: {value}")
     if isinstance(value, float):
         return value
+    if isinstance(value, complex):
+        return {"__complex__": [value.real, value.imag]}
     if isinstance(value, (list, tuple)):
         return [encode_value(item) for item in value]
     # Anything else (a class object, for instance) cannot be represented in
@@ -121,12 +123,16 @@ def encode_kwargs(kwargs, argument_kwargs):
             encoded[key] = choices
         elif key in ("const", "default"):
             encoded[key] = encode_value(value)
-        elif key in ("nargs", "dest", "required", "help", "version"):
+        elif key in ("nargs", "dest", "required", "help", "version",
+                     "description", "title"):
             encoded[key] = encode_value(value)
         elif key == "metavar":
-            if not isinstance(value, str):
+            if isinstance(value, str):
+                encoded[key] = value
+            elif isinstance(value, (tuple, list)):
+                encoded[key] = [str(item) for item in value]
+            else:
                 raise Unsupported(f"metavar {value!r}")
-            encoded[key] = value
         else:
             raise Unsupported(f"argument keyword {key!r}")
     return encoded
@@ -160,7 +166,7 @@ def encode_action(argument_kwargs, value):
     raise Unsupported(f"custom action {name}")
 
 
-BUILTIN_TYPES = {int: "int", float: "float", str: "str"}
+BUILTIN_TYPES = {int: "int", float: "float", str: "str", complex: "complex"}
 
 
 def encode_type(argument_kwargs, value):
@@ -175,6 +181,20 @@ def encode_choice(value, argument_kwargs):
     if isinstance(value, (str, int, float)) and not isinstance(value, bool):
         return value
     raise Unsupported(f"choice {value!r}")
+
+
+def encode_formatter(value):
+    import argparse as argparse_module
+    formatters = {
+        argparse_module.HelpFormatter: "HelpFormatter",
+        argparse_module.RawDescriptionHelpFormatter: "RawDescriptionHelpFormatter",
+        argparse_module.RawTextHelpFormatter: "RawTextHelpFormatter",
+        argparse_module.ArgumentDefaultsHelpFormatter: "ArgumentDefaultsHelpFormatter",
+        argparse_module.MetavarTypeHelpFormatter: "MetavarTypeHelpFormatter",
+    }
+    if value in formatters:
+        return formatters[value]
+    raise Unsupported(f"formatter {getattr(value, '__name__', value)!r}")
 
 
 def signature_payload(sig):
@@ -193,6 +213,12 @@ def parser_payload(sig):
         elif key == "prefix_chars":
             encoded[key] = encode_value(value)
         elif key == "argument_default":
+            encoded[key] = encode_value(value)
+        elif key == "formatter_class":
+            encoded[key] = encode_formatter(value)
+        elif key == "conflict_handler":
+            encoded[key] = encode_value(value)
+        elif key == "suggest_on_error":
             encoded[key] = encode_value(value)
         else:
             raise Unsupported(f"parser keyword {key!r}")
@@ -273,19 +299,37 @@ def extract_help_cases(module):
             "skip": None,
             "parser": {},
             "arguments": [],
+            "argument_groups": [],
+            "subparsers": [],
             "width": None,
             "usage": textwrap.dedent(getattr(cls, "usage", "")),
             "help": textwrap.dedent(getattr(cls, "help", "")),
         }
         try:
-            if getattr(cls, "argument_group_signatures", []):
-                raise Unsupported("argument groups")
-            if getattr(cls, "subparsers_signatures", []):
-                raise Unsupported("subparsers")
             record["parser"] = parser_payload(cls.parser_signature)
             record["arguments"] = [
                 signature_payload(sig) for sig in cls.argument_signatures
             ]
+            for group_sig, argument_sigs in getattr(cls, "argument_group_signatures", []):
+                record["argument_groups"].append({
+                    "group": signature_payload(group_sig),
+                    "arguments": [signature_payload(sig) for sig in argument_sigs],
+                })
+            for subparser_sig in getattr(cls, "subparsers_signatures", []):
+                sub_args = [str(item) for item in subparser_sig.args]
+                sub_name = subparser_sig.kwargs.get("name")
+                if sub_name is None and sub_args:
+                    sub_name = sub_args[0]
+                record["subparsers"].append({
+                    "name": sub_name,
+                    "kwargs": {
+                        key: encode_value(value)
+                        for key, value in subparser_sig.kwargs.items()
+                        if key in ("help", "aliases", "description", "usage", "epilog",
+                                   "prog", "add_help", "allow_abbrev", "exit_on_error",
+                                   "argument_default", "prefix_chars", "conflict_handler")
+                    },
+                })
             record["width"] = detect_width(cls, module, argparse_module, os)
         except Unsupported as error:
             record["skip"] = str(error)
@@ -299,6 +343,15 @@ def build_python_parser(cls, module, argparse_module, os):
     parser = argparse_module.ArgumentParser(*cls.parser_signature.args, **kwargs)
     for sig in cls.argument_signatures:
         parser.add_argument(*sig.args, **sig.kwargs)
+    for group_sig, argument_sigs in getattr(cls, "argument_group_signatures", []):
+        group = parser.add_argument_group(*group_sig.args, **group_sig.kwargs)
+        for sig in argument_sigs:
+            group.add_argument(*sig.args, **sig.kwargs)
+    subparser_sigs = getattr(cls, "subparsers_signatures", [])
+    if subparser_sigs:
+        subparsers = parser.add_subparsers()
+        for sig in subparser_sigs:
+            subparsers.add_parser(*sig.args, **sig.kwargs)
     return parser
 
 

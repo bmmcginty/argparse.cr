@@ -28,6 +28,13 @@ module CpythonCases
       result = Array(Argparse::Value).new
       raw.each { |item| result << decode_value(item) }
       result
+    when Hash(String, JSON::Any)
+      if complex = raw["__complex__"]?
+        values = complex.as_a
+        Complex.new(values[0].as_f, values[1].as_f).as(Argparse::Value)
+      else
+        raise "unsupported fixture value: #{raw.inspect}"
+      end
     else
       raise "unsupported fixture value: #{raw.inspect}"
     end
@@ -35,7 +42,9 @@ module CpythonCases
 
   def self.decode_spec(value : JSON::Any?) : Argparse::Spec
     return Argparse::UNSET if value.nil?
-    return Argparse::SUPPRESS if value.raw.is_a?(Hash) && value.as_h.has_key?("__suppress__")
+    if value.raw.is_a?(Hash)
+      return Argparse::SUPPRESS if value.as_h.has_key?("__suppress__")
+    end
     decode_value(value)
   end
 
@@ -77,12 +86,25 @@ module CpythonCases
       allow_abbrev: bool_option(parser_options, "allow_abbrev", true),
       prefix_chars: parser_options["prefix_chars"]?.try(&.as_s?) || "-",
       argument_default: decode_spec(parser_options["argument_default"]?),
+      conflict_handler: parser_options["conflict_handler"]?.try(&.as_s?) || "error",
+      suggest_on_error: bool_option(parser_options, "suggest_on_error", false),
+      formatter_class: decode_formatter(parser_options["formatter_class"]?),
       width: width
     )
     signatures.each do |signature|
       parser.add_argument(signature["args"].as_a.map(&.as_s), **keyword_arguments(signature))
     end
     parser
+  end
+
+  def self.decode_formatter(value : JSON::Any?) : Argparse::HelpFormatter.class
+    case value.try(&.as_s?)
+    when "RawDescriptionHelpFormatter" then Argparse::RawDescriptionHelpFormatter
+    when "RawTextHelpFormatter"        then Argparse::RawTextHelpFormatter
+    when "ArgumentDefaultsHelpFormatter" then Argparse::ArgumentDefaultsHelpFormatter
+    when "MetavarTypeHelpFormatter"    then Argparse::MetavarTypeHelpFormatter
+    else                                     Argparse::HelpFormatter
+    end
   end
 
   def self.bool_option(options : Hash(String, JSON::Any), key : String, fallback : Bool) : Bool
@@ -113,10 +135,19 @@ module CpythonCases
       choices:  decode_choices(hash["choices"]?),
       required: hash["required"]?.try(&.as_bool?),
       help:     decode_help(hash["help"]?),
-      metavar:  hash["metavar"]?.try(&.as_s?),
+      metavar:  decode_metavar(hash["metavar"]?),
       dest:     hash["dest"]?.try(&.as_s?),
       version:  hash["version"]?.try(&.as_s?),
     }
+  end
+
+  def self.decode_metavar(value : JSON::Any?) : String | Array(String) | Nil
+    return nil if value.nil?
+    case raw = value.raw
+    when String then raw
+    when Array(JSON::Any) then raw.map(&.as_s)
+    else nil
+    end
   end
 
   def self.decode_nargs(value : JSON::Any?) : Int32 | String | Nil
@@ -142,6 +173,8 @@ module CpythonCases
     getter documentation : String
     getter parser_options : Hash(String, JSON::Any)
     getter argument_signatures : Array(Hash(String, JSON::Any))
+    getter argument_groups : Array(Hash(String, JSON::Any))
+    getter subparsers : Array(Hash(String, JSON::Any))
     getter width : Int32
     getter usage : String
     getter help_text : String
@@ -149,11 +182,44 @@ module CpythonCases
     def initialize(@name : String, @documentation : String,
                    @parser_options : Hash(String, JSON::Any),
                    @argument_signatures : Array(Hash(String, JSON::Any)),
+                   @argument_groups : Array(Hash(String, JSON::Any)),
+                   @subparsers : Array(Hash(String, JSON::Any)),
                    @width : Int32, @usage : String, @help_text : String)
     end
 
     def build_parser : Argparse::ArgumentParser
-      CpythonCases.build_parser(@parser_options, @argument_signatures, @width)
+      parser = CpythonCases.build_parser(@parser_options, @argument_signatures, @width)
+      @argument_groups.each do |entry|
+        signature = entry["group"].as_h
+        title = signature["args"].as_a.first?.try(&.as_s?)
+        description = signature["kwargs"].as_h["description"]?.try(&.as_s?)
+        group = parser.add_argument_group(title, description)
+        entry["arguments"].as_a.each do |argument|
+          hash = argument.as_h
+          args = hash["args"].as_a.map(&.as_s)
+          group.add_argument(args, **CpythonCases.keyword_arguments(hash))
+        end
+      end
+      unless @subparsers.empty?
+        subparsers = parser.add_subparsers
+        @subparsers.each do |hash|
+          kwargs = hash["kwargs"].as_h
+          subparsers.add_parser(
+            hash["name"].as_s,
+            aliases: kwargs["aliases"]?.try(&.as_a.map(&.as_s)) || [] of String,
+            help: kwargs["help"]?.try(&.as_s?),
+            description: kwargs["description"]?.try(&.as_s?),
+            usage: kwargs["usage"]?.try(&.as_s?),
+            epilog: kwargs["epilog"]?.try(&.as_s?),
+            prog: kwargs["prog"]?.try(&.as_s?),
+            add_help: CpythonCases.bool_option(kwargs, "add_help", true),
+            allow_abbrev: CpythonCases.bool_option(kwargs, "allow_abbrev", true),
+            exit_on_error: CpythonCases.bool_option(kwargs, "exit_on_error", false),
+            conflict_handler: kwargs["conflict_handler"]?.try(&.as_s?) || "error",
+            prefix_chars: kwargs["prefix_chars"]?.try(&.as_s?) || "-")
+        end
+      end
+      parser
     end
   end
 
@@ -168,11 +234,17 @@ module CpythonCases
       next if entry["skip"]?.try(&.as_s?)
       signatures = Array(Hash(String, JSON::Any)).new
       entry["arguments"].as_a.each { |signature| signatures << signature.as_h }
+      groups = Array(Hash(String, JSON::Any)).new
+      entry["argument_groups"]?.try(&.as_a.each { |group| groups << group.as_h })
+      subparsers = Array(Hash(String, JSON::Any)).new
+      entry["subparsers"]?.try(&.as_a.each { |subparser| subparsers << subparser.as_h })
       result << HelpCase.new(
         entry["name"].as_s,
         entry["documentation"]?.try(&.as_s?) || "",
         entry["parser"].as_h,
         signatures,
+        groups,
+        subparsers,
         entry["width"].as_i,
         entry["usage"].as_s,
         entry["help"].as_s

@@ -1066,13 +1066,257 @@
       ]
     },
     {
-      "arguments": [],
+      "arguments": [
+        {
+          "args": [
+            "--int"
+          ],
+          "kwargs": {
+            "type": "int"
+          }
+        },
+        {
+          "args": [
+            "--float"
+          ],
+          "kwargs": {
+            "type": "float"
+          }
+        },
+        {
+          "args": [
+            "--complex"
+          ],
+          "kwargs": {
+            "type": "complex"
+          }
+        }
+      ],
       "documentation": "Test parsing negative numbers",
-      "failures": [],
+      "failures": [
+        [
+          "--float",
+          "-_.45"
+        ],
+        [
+          "--float",
+          "-1__000.0"
+        ],
+        [
+          "--float",
+          "-1.0.0"
+        ],
+        [
+          "--int",
+          "-1__000"
+        ],
+        [
+          "--int",
+          "-1.0"
+        ],
+        [
+          "--complex",
+          "-1__000.0j"
+        ],
+        [
+          "--complex",
+          "-1.0jj"
+        ],
+        [
+          "--complex",
+          "-_.45j"
+        ]
+      ],
       "name": "TestNegativeNumber",
       "parser": {},
-      "skip": "type 'complex'",
-      "successes": []
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "--int",
+            "-1000",
+            "--float",
+            "-1000.0"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -1000.0,
+            "int": -1000
+          }
+        },
+        {
+          "argv": [
+            "--int",
+            "-1_000",
+            "--float",
+            "-1_000.0"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -1000.0,
+            "int": -1000
+          }
+        },
+        {
+          "argv": [
+            "--int",
+            "-1_000_000",
+            "--float",
+            "-1_000_000.0"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -1000000.0,
+            "int": -1000000
+          }
+        },
+        {
+          "argv": [
+            "--float",
+            "-1_000.0"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -1000.0,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--float",
+            "-1_000_000.0_0"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -1000000.0,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--float",
+            "-.5"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -0.5,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--float",
+            "-.5_000"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -0.5,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--float",
+            "-1e3"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -1000,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--float",
+            "-1e-3"
+          ],
+          "namespace": {
+            "complex": null,
+            "float": -0.001,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--complex",
+            "-1j"
+          ],
+          "namespace": {
+            "complex": {
+              "__complex__": [
+                -0.0,
+                -1.0
+              ]
+            },
+            "float": null,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--complex",
+            "-1_000j"
+          ],
+          "namespace": {
+            "complex": {
+              "__complex__": [
+                -0.0,
+                -1000.0
+              ]
+            },
+            "float": null,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--complex",
+            "-1_000.0j"
+          ],
+          "namespace": {
+            "complex": {
+              "__complex__": [
+                -0.0,
+                -1000.0
+              ]
+            },
+            "float": null,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--complex",
+            "-1e3j"
+          ],
+          "namespace": {
+            "complex": {
+              "__complex__": [
+                -0.0,
+                -1000.0
+              ]
+            },
+            "float": null,
+            "int": null
+          }
+        },
+        {
+          "argv": [
+            "--complex",
+            "-1e-3j"
+          ],
+          "namespace": {
+            "complex": {
+              "__complex__": [
+                -0.0,
+                -0.001
+              ]
+            },
+            "float": null,
+            "int": null
+          }
+        }
+      ]
     },
     {
       "arguments": [
@@ -8086,13 +8330,82 @@
       ]
     },
     {
-      "arguments": [],
+      "arguments": [
+        {
+          "args": [
+            "--eggs"
+          ],
+          "kwargs": {
+            "type": "complex"
+          }
+        },
+        {
+          "args": [
+            "spam"
+          ],
+          "kwargs": {
+            "type": "float"
+          }
+        }
+      ],
       "documentation": "Test some callables as option/argument types",
-      "failures": [],
+      "failures": [
+        [
+          "a"
+        ],
+        [
+          "42j"
+        ],
+        [
+          "--eggs",
+          "a"
+        ],
+        [
+          "--eggs",
+          "2i"
+        ]
+      ],
       "name": "TestTypeCallable",
       "parser": {},
-      "skip": "type 'complex'",
-      "successes": []
+      "skip": null,
+      "successes": [
+        {
+          "argv": [
+            "--eggs=42",
+            "42"
+          ],
+          "namespace": {
+            "eggs": 42,
+            "spam": 42.0
+          }
+        },
+        {
+          "argv": [
+            "--eggs",
+            "2j",
+            "--",
+            "-1.5"
+          ],
+          "namespace": {
+            "eggs": {
+              "__complex__": [
+                0.0,
+                2.0
+              ]
+            },
+            "spam": -1.5
+          }
+        },
+        {
+          "argv": [
+            "1024.675"
+          ],
+          "namespace": {
+            "eggs": null,
+            "spam": 1024.675
+          }
+        }
+      ]
     },
     {
       "arguments": [],
