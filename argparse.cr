@@ -25,6 +25,12 @@ module Argparse
 
   UNSET = Unset.new
 
+  OPTIONAL      = "?"
+  ZERO_OR_MORE  = "*"
+  ONE_OR_MORE   = "+"
+  PARSER        = "A..."
+  REMAINDER     = "..."
+
   # Placeholder matching `argparse.SUPPRESS`: an argument with this default
   # simply does not appear in the resulting namespace.
   class Suppress
@@ -351,6 +357,30 @@ module Argparse
     end
   end
 
+  # Base class for user defined actions.  An action instance or an action
+  # class with a no-argument constructor may be passed as `action:`.  The
+  # parser fills in the standard fields before calling `call`.
+  class Action
+    property option_strings = [] of String
+    property dest = ""
+    property nargs : Nil | Int32 | String | Suppress = nil
+    property required = false
+    property help : String? | Suppress = nil
+    property metavar : Metavar? = nil
+
+    def initialize
+    end
+
+    def call(parser : ArgumentParser, namespace : Namespace,
+             values : Value, option_string : String?) : Nil
+      raise NotImplementedError.new("Action#call must be implemented")
+    end
+  end
+
+  # Marker used to select BooleanOptionalAction via `action:`.
+  class BooleanOptionalAction
+  end
+
   # One command line argument: either an optional (`-x`, `--foo`) or a
   # positional.
   class Argument
@@ -370,6 +400,7 @@ module Argparse
     property dest_suppressed : Bool
     property subparsers : SubparsersAction?
     getter deprecated : Bool
+    getter custom_action : Action?
 
     def initialize(@option_strings : Array(String), @dest : String,
                    @action : String, @nargs : Nil | Int32 | String | Suppress,
@@ -380,7 +411,8 @@ module Argparse
                    @converter : Proc(String, Value)? = nil,
                    @dest_suppressed : Bool = false,
                    @subparsers : SubparsersAction? = nil,
-                   @deprecated : Bool = false)
+                   @deprecated : Bool = false,
+                   @custom_action : Action? = nil)
     end
 
     # True for `-x`/`--foo` style arguments.
@@ -773,6 +805,7 @@ module Argparse
     @has_negative_number_optionals = false
     @parser_defaults = {} of String => Spec
     @subparsers_action : SubparsersAction? = nil
+    @action_registry = {} of String => Action | Action.class
 
     def initialize(prog : String? = nil, @usage : String | Suppress | Nil = nil,
                    @description : String? = nil, @epilog : String? = nil,
@@ -813,7 +846,7 @@ module Argparse
     # Defining arguments
     # ---------------------------------------------------------------
 
-    def add_argument(*args : String, action : String | Nil = nil,
+    def add_argument(*args : String, action : String | Action | Action.class | BooleanOptionalAction.class | Nil = nil,
                      nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
                      type : String | Symbol | Proc(String, Value) | FileType | Nil = nil,
@@ -828,7 +861,7 @@ module Argparse
         choices, required, help, metavar, dest, version, nil, nil, deprecated)
     end
 
-    def add_argument(*args : String, action : String | Nil = nil,
+    def add_argument(*args : String, action : String | Action | Action.class | BooleanOptionalAction.class | Nil = nil,
                      nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
                      type : String | Symbol | Proc(String, Value) | FileType | Nil = nil,
@@ -906,7 +939,7 @@ module Argparse
       argument
     end
 
-    private def add_argument_impl(names : Array(String), action : String?,
+    private def add_argument_impl(names : Array(String), action : String | Action | Action.class | BooleanOptionalAction.class | Nil,
                                   nargs : Int32 | String | Suppress | Nil,
                                   raw_const : Object?, raw_default : Object?,
                                   raw_type : String | Symbol | Proc(String, Value) | FileType | Nil,
@@ -968,10 +1001,26 @@ module Argparse
         option_strings = [] of String
       end
 
-      action_name = (action || "store").gsub('-', '_')
+      custom_action = case action
+                      when Action          then action
+                      when Action.class    then action.new
+                      else                      nil
+                      end
+      action_name = if action.is_a?(BooleanOptionalAction.class)
+                      "boolean_optional"
+                    elsif custom_action
+                      "custom"
+                    else
+                      (action.as?(String) || "store").gsub('-', '_')
+                    end
       action_name = "boolean_optional" if action_name == "BooleanOptionalAction"
-      unless ACTION_NAMES.includes?(action_name)
-        raise ConfigurationError.new("unknown action #{action.inspect}")
+      if action_name != "custom" && !ACTION_NAMES.includes?(action_name)
+        if registered = @action_registry[action_name]?
+          custom_action = registered.is_a?(Action.class) ? registered.new : registered
+          action_name = "custom"
+        else
+          raise ConfigurationError.new("unknown action #{action.inspect}")
+        end
       end
       check_nargs(nargs)
       check_action_kwargs(action_name, nargs, const)
@@ -1017,7 +1066,15 @@ module Argparse
       argument = Argument.new(option_strings, destination, action_name,
         effective_nargs, resolved_const, resolved_default, type, choices,
         required_flag, help, normalized_metavar, version, effective_converter,
-        dest_suppressed, nil, deprecated)
+        dest_suppressed, nil, deprecated, custom_action)
+      if custom = custom_action
+        custom.option_strings = option_strings
+        custom.dest = destination
+        custom.nargs = effective_nargs
+        custom.required = required_flag
+        custom.help = help
+        custom.metavar = normalized_metavar
+      end
       check_conflicts(argument)
       @actions << argument
       group = target_group || (option_strings.empty? ? @positionals_group.not_nil! : @optionals_group.not_nil!)
@@ -1075,6 +1132,8 @@ module Argparse
         if nargs != "A..."
           raise ConfigurationError.new("nargs must be 'A...' for action parsers")
         end
+      when "custom"
+        # User actions are responsible for interpreting their own nargs.
       else
         if !nargs.nil? && nargs != 0
           raise ConfigurationError.new("nargs must be 0 for action #{action}")
@@ -1122,7 +1181,7 @@ module Argparse
     end
 
     # Overload used when argument names are only known at runtime.
-    def add_argument(names : Array(String), action : String | Nil = nil,
+    def add_argument(names : Array(String), action : String | Action | Action.class | BooleanOptionalAction.class | Nil = nil,
                      nargs : Int32 | String | Suppress | Nil = nil,
                      const : Object? = UNSET, default : Object? = UNSET,
                      type : String | Symbol | Proc(String, Value) | FileType | Nil = nil,
@@ -1231,6 +1290,19 @@ module Argparse
       argument.subparsers = action
       @subparsers_action = action
       action
+    end
+
+    # Registers a custom action under a name accepted by action:.
+    def register_action(name : String, action : Action | Action.class) : Nil
+      @action_registry[name] = action
+    end
+
+    # Compatibility helper for CPython's register('action', name, action).
+    def register(registry_name : String, value : String?, action : Action | Action.class) : Nil
+      unless registry_name == "action"
+        raise ConfigurationError.new("unsupported registry #{registry_name.inspect}")
+      end
+      register_action(value || "store", action)
     end
 
     # Sets defaults for destinations that are not otherwise defined, and
@@ -1866,6 +1938,8 @@ module Argparse
       when "version"
         puts action.version
         exit(0)
+      when "custom"
+        action.custom_action.not_nil!.call(self, namespace, unwrap(values), option_string)
       when "parsers"
         subparsers = action.subparsers.not_nil!
         items = values.as(Array(Value))

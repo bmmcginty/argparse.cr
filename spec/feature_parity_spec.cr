@@ -476,3 +476,42 @@ describe "suggestions and translations" do
     end
   end
 end
+
+private class ShoutAction < Argparse::Action
+  def call(parser : Argparse::ArgumentParser, namespace : Argparse::Namespace,
+           values : Argparse::Value, option_string : String?) : Nil
+    namespace["word"] = values.as(String).upcase
+  end
+end
+
+describe "custom actions and public constants" do
+  it "accepts an action instance" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--word", action: ShoutAction.new)
+    parser.parse_args(["--word", "hello"]).should eq(values(word: "HELLO"))
+  end
+
+  it "accepts an action class" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--word", action: ShoutAction)
+    parser.parse_args(["--word", "hello"]).should eq(values(word: "HELLO"))
+  end
+
+  it "resolves registered action names" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.register_action("shout", ShoutAction)
+    parser.add_argument("--word", action: "shout")
+    parser.parse_args(["--word", "hello"]).should eq(values(word: "HELLO"))
+  end
+
+  it "exposes BooleanOptionalAction and the nargs constants" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--color", action: Argparse::BooleanOptionalAction)
+    parser.parse_args(["--no-color"]).should eq(values(color: false))
+    Argparse::OPTIONAL.should eq("?")
+    Argparse::ZERO_OR_MORE.should eq("*")
+    Argparse::ONE_OR_MORE.should eq("+")
+    Argparse::PARSER.should eq("A...")
+    Argparse::REMAINDER.should eq("...")
+  end
+end
