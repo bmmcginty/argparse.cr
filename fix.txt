@@ -22,6 +22,7 @@ Items are checked off as they are implemented and verified.
 - [x] `FileType` and file objects in namespaces
 - [x] `ArgumentTypeError` for user supplied converters
 - [x] public action/nargs constants (`OPTIONAL`, `ZERO_OR_MORE`, `ONE_OR_MORE`, `PARSER`, `REMAINDER`, `SUPPRESS`) and `BooleanOptionalAction`
+- [x] built-in `complex` type and Python numeric underscore validation (added during conformance work)
 
 ## Parsing
 
@@ -39,6 +40,6 @@ Items are checked off as they are implemented and verified.
 
 ## Verification
 
-- [ ] Extend the CPython extractor to cover newly supported parser keywords, actions, and types
-- [ ] Regenerate the conformance fixtures
-- [ ] Update README with the new supported API and remaining (language-inherent) limits
+- [x] Extend the CPython extractor to cover newly supported parser keywords, actions, and types
+- [x] Regenerate the conformance fixtures
+- [x] Update README with the new supported API and remaining (language-inherent) limits

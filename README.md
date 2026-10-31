@@ -36,22 +36,65 @@ and the arguments that were not recognised:
 options, extras = parser.parse_known_args(["--unknown", "file.txt"])
 ```
 
+Subcommands, argument groups, inherited parsers, and intermixed positionals are
+also supported:
+
+```crystal
+parser = Argparse::ArgumentParser.new(prog: "demo")
+subparsers = parser.add_subparsers(dest: "command", required: true)
+
+serve = subparsers.add_parser("serve", help: "start the server")
+serve.add_argument("--port", type: "int", default: 8080_i64)
+serve.add_argument("files", nargs: "*")
+
+options = parser.parse_args(["serve", "a.txt", "--port", "9000"])
+```
+
 The public API mirrors Python where Crystal allows it:
 
-* `ArgumentParser.new(prog:, usage:, description:, epilog:, add_help:,
-  prefix_chars:, allow_abbrev:, argument_default:, exit_on_error:)`, plus a
-  `width:` extension that controls help wrapping (default `78`, the terminal
-  width Python uses).
+* `ArgumentParser.new(prog:, usage:, description:, epilog:, parents:,
+  formatter_class:, prefix_chars:, fromfile_prefix_chars:, argument_default:,
+  conflict_handler:, add_help:, allow_abbrev:, exit_on_error:,
+  suggest_on_error:)`, plus a `width:` extension that controls help wrapping
+  (default `78`, the terminal width Python uses).
 * `add_argument(*names, action:, nargs:, const:, default:, type:, choices:,
-  required:, help:, metavar:, dest:, version:)`.  `action` accepts `store`,
-  `store_const`, `store_true`, `store_false`, `append`, `append_const`, `extend`,
-  `count`, `help`, `version` and `boolean_optional`.
-* `add_mutually_exclusive_group(required:)`, `set_defaults(**defaults)`,
-  `get_default(dest)`, `format_usage`, `format_help`, `print_usage`,
-  `print_help`, `error(message)`.
-* `Argparse::SUPPRESS` as a `default:` or `help:` value.
-* A block instead of `type:` supplies a custom converter:
-  `parser.add_argument("--path") { |value| Path[value].as(Argparse::Value) }`.
+  required:, help:, metavar:, dest:, version:, deprecated:)`.  `action` accepts
+  the built-in names (`store`, `store_const`, `store_true`, `store_false`,
+  `append`, `append_const`, `extend`, `count`, `help`, `version`,
+  `boolean_optional`), `Argparse::BooleanOptionalAction`, or a custom
+  `Argparse::Action` instance/class.
+* `nargs:` accepts an integer, `?`, `*`, `+`, `...`, `A...`, the matching
+  constants (`Argparse::OPTIONAL`, `Argparse::ZERO_OR_MORE`,
+  `Argparse::ONE_OR_MORE`, `Argparse::PARSER`, `Argparse::REMAINDER`), or
+  `Argparse::SUPPRESS`.
+* `metavar:` accepts a string or an array of strings for tuple-style nargs.
+* `type:` accepts `"int"`, `"float"`, `"complex"`, `"str"`, a `Proc(String,
+  Value)`, or an `Argparse::FileType`.  A block instead of `type:` supplies a
+  custom converter; converters may raise `Argparse::ArgumentTypeError` to
+  choose the error message.
+* `add_argument_group(title:, description:)`,
+  `add_mutually_exclusive_group(required:)`, `add_subparsers(...)`,
+  `SubparsersAction#add_parser(name, aliases:, help:, deprecated:, ...)`,
+  `set_defaults(**defaults)`, and `get_default(dest)`.
+* `parse_args(args, namespace)`, `parse_known_args(args, namespace)`,
+  `parse_intermixed_args`, and `parse_known_intermixed_args`.
+* `fromfile_prefix_chars:` argument files, with an overridable
+  `convert_arg_line_to_args(line)` hook.
+* `conflict_handler: "error" | "resolve"` and `parents: [parser, ...]`.
+* `formatter_class:` with `Argparse::HelpFormatter`,
+  `Argparse::RawDescriptionHelpFormatter`, `Argparse::RawTextHelpFormatter`,
+  `Argparse::ArgumentDefaultsHelpFormatter`, and
+  `Argparse::MetavarTypeHelpFormatter`, or a `Proc(String, HelpFormatter)`
+  factory.  Custom formatters may override `fill_text`, `split_lines`,
+  `help_string`, and the default metavar methods.
+* `Argparse::SUPPRESS` as a `default:`, `help:`, `dest:`, or `nargs:` value.
+* `register_action(name, action)` / `register("action", name, action)` for
+  name-based custom actions.
+* `format_usage`, `format_help`, `print_usage`, `print_help`, `error(message)`,
+  `warning(message)`, `print_message(message, io)`, and
+  `exit(status, message)`.
+* `Argparse.translator = ->(message : String) { ... }` for gettext-style
+  message translation.
 
 Values are stored in an `Argparse::Namespace` which offers `[]`, `[]?`,
 `has_key?`, `to_h` and typed readers (`string`, `int`, `float`, `bool`, `array`).
@@ -63,15 +106,16 @@ the expectations are Python's, not hand-written approximations:
 
 ```console
 $ crystal spec
-883 examples, 0 failures
+980 examples, 0 failures
 ```
 
 * `spec/fixtures/cpython_test_argparse.json` holds the data driven
-  `ParserTestCase` classes this port supports (89 classes, 388 accepted command
-  lines with their expected namespace, 328 rejected command lines).
+  `ParserTestCase` classes this port supports (91 classes, 405 accepted command
+  lines with their expected namespace, 340 rejected command lines).
 * `spec/fixtures/cpython_help_cases.json` holds the `HelpTestCase` classes that
   use features this port supports, with the exact usage and help text CPython
-  prints for them (24 classes).
+  prints for them (39 classes), including named groups, formatter classes,
+  subparsers, and tuple metavars.
 
 Regenerate both fixtures (the script downloads the pinned CPython tag, or pass
 `--source` for a local copy):
@@ -83,23 +127,25 @@ $ python3 spec/support/extract_python_cases.py \
 ```
 
 Error messages, exit statuses, `parse_known_args` behaviour, `--` handling,
-namespace defaults and mutually exclusive groups are additionally covered by
-`spec/argparse_spec.cr` (30 examples), ported by hand from the upstream unit
-tests.
+namespace defaults, mutually exclusive groups, argument files, intermixed
+parsing, formatters, custom actions, deprecation warnings, and suggestions are
+additionally covered by hand-written specs in `spec/argparse_spec.cr` and
+`spec/feature_parity_spec.cr`.
 
 ### Not implemented
 
-These upstream feature groups are skipped by the extractor and have no
-equivalent here:
+These limits are language- or runtime-specific rather than missing parser
+features:
 
-* `add_subparsers` and parser inheritance via `parents=`.
-* Named argument groups (`add_argument_group`) and their help layout.
-* `fromfile_prefix_chars` argument files, `FileType`/`type=open`, and
-  `parse_intermixed_args`.
-* Custom `Action` subclasses, arbitrary `type` callables other than through a
-  block, tuple `metavar`s, formatter classes, `deprecated=` options, message
-  translations, and `suggest_on_error:` "did you mean" hints.
-* `argparse.SUPPRESS` for `dest`/`nargs`.
-
-Integer values are `Int64`; Python's arbitrary precision integers overflow
-instead of widening.
+* Python `Action` subclasses cannot be imported into Crystal.  Use an
+  `Argparse::Action` subclass/instance, a block converter, or
+  `register_action` instead.
+* Python objects and arbitrary Python callables cannot be used from Crystal;
+  `Proc`, `FileType`, and `Action` are the Crystal equivalents.
+* Message translation uses `Argparse.translator` rather than Python gettext
+  catalogs.
+* Colorized help/error output (`color=`) is not emitted.
+* `FileType` returns a Crystal `IO`; `bufsize`, `encoding`, and `errors` are
+  accepted for API compatibility but are not applied by Crystal's file API.
+* Integer values are `Int64`; Python's arbitrary precision integers overflow
+  instead of widening.
