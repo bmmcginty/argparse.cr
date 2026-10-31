@@ -13,7 +13,7 @@ Items are checked off as they are implemented and verified.
 
 ## Arguments and actions
 
-- [ ] `add_subparsers` with `dest`, `required`, `help`, `metavar`, `title`, `description`, `prog`, aliases, custom parser classes, nested subparsers, and subcommand help
+- [x] `add_subparsers` with `dest`, `required`, `help`, `metavar`, `title`, `description`, `prog`, aliases, custom parser classes, nested subparsers, and subcommand help
 - [ ] tuple `metavar` values, including validation against `nargs`
 - [ ] `argparse.SUPPRESS` for `dest` and `nargs`
 - [ ] `deprecated=` for options, positionals, and subcommands

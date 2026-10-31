@@ -239,11 +239,13 @@ module Argparse
     property default : Spec
     getter type_name : String?
     getter choices : Array(Value)?
-    getter required : Bool
+    property required : Bool
     getter help : String? | Suppress
     getter metavar : String?
     getter version : String?
     getter converter : Proc(String, Value)?
+    property dest_suppressed : Bool
+    property subparsers : SubparsersAction?
 
     def initialize(@option_strings : Array(String), @dest : String,
                    @action : String, @nargs : Nil | Int32 | String,
@@ -251,7 +253,9 @@ module Argparse
                    @choices : Array(Value)?, @required : Bool,
                    @help : String? | Suppress, @metavar : String?,
                    @version : String?,
-                   @converter : Proc(String, Value)? = nil)
+                   @converter : Proc(String, Value)? = nil,
+                   @dest_suppressed : Bool = false,
+                   @subparsers : SubparsersAction? = nil)
     end
 
     # True for `-x`/`--foo` style arguments.
@@ -262,7 +266,17 @@ module Argparse
     # The name used in error messages, mirroring `argparse._get_action_name`.
     def name : String
       return @option_strings.join('/') if option?
-      @metavar || @dest
+      if subparsers = @subparsers
+        return @metavar || "{#{subparsers.choices_names.join(',')}}"
+      end
+      if metavar = @metavar
+        return metavar
+      end
+      return @dest unless @dest_suppressed
+      if choices = @choices
+        return "{%s}" % choices.map { |choice| Argparse.py_str(choice) }.join(',') unless choices.empty?
+      end
+      ""
     end
 
     # Converts one command line word to a value.
@@ -317,6 +331,79 @@ module Argparse
       else
         raise ArgumentError.new("invalid float value: #{Argparse.py_repr(text)}")
       end
+    end
+  end
+
+  # State for an `add_subparsers` action.  The parser stores a regular
+  # positional action with nargs "A..." and links it to this object.
+  class SubparsersAction
+    getter parser : ArgumentParser
+    getter argument : Argument
+    getter prog : String
+    getter parser_class : ArgumentParser.class
+    getter name_parser_map = {} of String => ArgumentParser
+    getter choices_actions = [] of Argument
+    getter deprecated_names = Set(String).new
+
+    def initialize(@parser : ArgumentParser, @argument : Argument, @prog : String,
+                   @parser_class : ArgumentParser.class)
+    end
+
+    def choices_names : Array(String)
+      @name_parser_map.keys
+    end
+
+    def required? : Bool
+      @argument.required
+    end
+
+    def required=(value : Bool) : Bool
+      @argument.required = value
+    end
+
+    def add_parser(name : String, aliases : Array(String) = [] of String,
+                   help : String? = nil, deprecated : Bool = false,
+                   prog : String? = nil,
+                   usage : String | Suppress | Nil = nil,
+                   description : String? = nil, epilog : String? = nil,
+                   parents : Array(ArgumentParser) = [] of ArgumentParser,
+                   prefix_chars : String = "-",
+                   argument_default : Object? = UNSET,
+                   conflict_handler : String = "error",
+                   add_help : Bool = true, allow_abbrev : Bool = true,
+                   exit_on_error : Bool = true,
+                   width : Int32 = 78) : ArgumentParser
+      if @name_parser_map.has_key?(name)
+        raise ConfigurationError.new("conflicting subparser: #{name}")
+      end
+      aliases.each do |alias_name|
+        if @name_parser_map.has_key?(alias_name)
+          raise ConfigurationError.new("conflicting subparser alias: #{alias_name}")
+        end
+      end
+
+      subparser_prog = prog || "#{@prog} #{name}"
+      subparser = @parser_class.new(
+        prog: subparser_prog, usage: usage, description: description, epilog: epilog,
+        parents: parents, add_help: add_help, prefix_chars: prefix_chars,
+        allow_abbrev: allow_abbrev,
+        argument_default: Argparse.normalize(argument_default),
+        conflict_handler: conflict_handler, exit_on_error: exit_on_error,
+        width: width)
+
+      if help
+        metavar = aliases.empty? ? name : "#{name} (#{aliases.join(", ")})"
+        @choices_actions << Argument.new([] of String, name, "store", nil,
+          nil, nil, nil, nil, false, help, metavar, nil)
+      end
+
+      @name_parser_map[name] = subparser
+      aliases.each { |alias_name| @name_parser_map[alias_name] = subparser }
+      if deprecated
+        @deprecated_names << name
+        aliases.each { |alias_name| @deprecated_names << alias_name }
+      end
+      subparser
     end
   end
 
@@ -428,6 +515,7 @@ module Argparse
     @optionals_group : ArgumentGroup?
     @has_negative_number_optionals = false
     @parser_defaults = {} of String => Spec
+    @subparsers_action : SubparsersAction? = nil
 
     def initialize(prog : String? = nil, @usage : String | Suppress | Nil = nil,
                    @description : String? = nil, @epilog : String? = nil,
@@ -440,6 +528,7 @@ module Argparse
                    @width : Int32 = 78)
       @prog = prog || File.basename(PROGRAM_NAME)
       @conflict_handler = conflict_handler
+      @argument_groups = [] of ArgumentGroup
       unless conflict_handler == "error" || conflict_handler == "resolve"
         raise ConfigurationError.new("invalid conflict_resolution value: #{conflict_handler.inspect}")
       end
@@ -602,10 +691,14 @@ module Argparse
                         when "store_const", "store_true", "store_false", "append_const",
                              "count", "help", "version", "boolean_optional"
                           0
+                        when "parsers"
+                          "A..."
                         else
                           nargs
                         end
-      required_flag = if required.nil?
+      required_flag = if action_name == "parsers"
+                        required || false
+                      elsif required.nil?
                         option_strings.empty? && !(nargs == "?" || nargs == "*")
                       else
                         required.as(Bool)
@@ -637,8 +730,8 @@ module Argparse
     end
 
     private ACTION_NAMES = %w[store store_const store_true store_false append append_const count help
-      version extend boolean_optional]
-    private NARGS_NAMES = %w[? * + ...]
+      version extend boolean_optional parsers]
+    private NARGS_NAMES = %w[? * + ... A...]
 
     private def has_prefix?(name : String) : Bool
       !name.empty? && @prefix_chars.includes?(name[0])
@@ -673,6 +766,10 @@ module Argparse
         end
         if !const.is_a?(Unset) && nargs != "?"
           raise ConfigurationError.new("nargs must be '?' to supply const")
+        end
+      when "parsers"
+        if nargs != "A..."
+          raise ConfigurationError.new("nargs must be 'A...' for action parsers")
         end
       else
         if !nargs.nil? && nargs != 0
@@ -796,6 +893,41 @@ module Argparse
       end
     end
 
+    # Adds the subcommand positional.  The returned object creates and stores
+    # the child parsers, and can be configured further through `add_parser`.
+    def add_subparsers(required : Bool = false,
+                       dest : String | Suppress | Nil = SUPPRESS,
+                       help : String | Suppress | Nil = nil,
+                       metavar : String | Nil = nil,
+                       title : String | Suppress | Nil = nil,
+                       description : String | Suppress | Nil = nil,
+                       prog : String? = nil,
+                       parser_class : ArgumentParser.class = ArgumentParser) : SubparsersAction
+      if @subparsers_action
+        raise ConfigurationError.new("cannot have multiple subparser arguments")
+      end
+
+      target_group = if title || description
+                       add_argument_group(title || "subcommands", description)
+                     else
+                       @positionals_group.not_nil!
+                     end
+      dest_name = dest.is_a?(String) ? dest : "__subparsers__"
+      computed_prog = prog || begin
+        positionals = @actions.select { |argument| !argument.option? && !argument.help.is_a?(Suppress) }
+        parts, _ = usage_parts(positionals)
+        ([@prog] + parts).join(' ')
+      end
+
+      argument = add_argument_impl([dest_name], "parsers", "A...", UNSET, UNSET,
+        nil, nil, required, help, metavar, nil, nil, nil, target_group)
+      argument.dest_suppressed = dest.is_a?(Suppress) || dest.nil?
+      action = SubparsersAction.new(self, argument, computed_prog, parser_class)
+      argument.subparsers = action
+      @subparsers_action = action
+      action
+    end
+
     # Sets defaults for destinations that are not otherwise defined, and
     # overrides the default of arguments that already exist (like
     # `argparse.ArgumentParser.set_defaults`).
@@ -851,6 +983,7 @@ module Argparse
     def parse_known_args(args : Enumerable(String) = ARGV) : Tuple(Namespace, Array(String))
       namespace = Namespace.new
       @actions.each do |argument|
+        next if argument.dest_suppressed
         next if namespace.has_key?(argument.dest)
         default = argument.default
         next if default.is_a?(Suppress) || default.is_a?(Unset)
@@ -1170,6 +1303,8 @@ module Argparse
         option ? "(A+)" : "(-*A[A-]*)"
       when "..."
         option ? "([AO]*)" : "(.*)"
+      when "A..."
+        option ? "(A[AO]*)" : "(-*A[-AO]*)"
       else
         count = nargs.as(Int32)
         option ? "([AO]{#{count}})" : "((?:-*A){#{count}}-*)"
@@ -1276,6 +1411,23 @@ module Argparse
       when "version"
         puts action.version
         exit(0)
+      when "parsers"
+        subparsers = action.subparsers.not_nil!
+        items = values.as(Array(Value))
+        parser_name = items.first.as(String)
+        remaining = items[1..].map(&.as(String))
+        namespace[action.dest] = parser_name unless action.dest_suppressed
+        subparser = subparsers.name_parser_map[parser_name]?
+        unless subparser
+          choices = subparsers.name_parser_map.keys.join(", ")
+          raise ArgumentError.new("unknown parser #{Argparse.py_repr(parser_name)} (choices: #{choices})", action.name)
+        end
+        if subparsers.deprecated_names.includes?(parser_name)
+          STDERR.puts "#{@prog}: warning: command '#{parser_name}' is deprecated"
+        end
+        subnamespace, subextras = subparser.parse_known_args(remaining)
+        subnamespace.values.each { |key, value| namespace[key] = value }
+        run.extras.concat(subextras)
       end
     end
 
@@ -1328,7 +1480,7 @@ module Argparse
           required_actions << action.name
         else
           default = action.default
-          if default.is_a?(String) && run.namespace.has_key?(action.dest)
+          if !action.dest_suppressed && default.is_a?(String) && run.namespace.has_key?(action.dest)
             # CPython converts string defaults that were never overridden.
             run.namespace[action.dest] = action.convert(default)
           end
@@ -1554,6 +1706,7 @@ module Argparse
       when "*"   then "[#{metavar} ...]"
       when "+"   then "#{metavar} [#{metavar} ...]"
       when "..." then "..."
+      when "A..." then "#{metavar} ..."
       else            Array.new(nargs.as(Int32), metavar).join(' ')
       end
     end
@@ -1561,6 +1714,9 @@ module Argparse
     private def metavar_for(argument : Argument) : String
       if metavar = argument.metavar
         return metavar
+      end
+      if subparsers = argument.subparsers
+        return "{#{subparsers.choices_names.join(',')}}"
       end
       if choices = argument.choices
         return "{#{choices.map { |choice| Argparse.py_str(choice) }.join(',')}}"
@@ -1602,36 +1758,45 @@ module Argparse
 
     private def write_actions(io : IO, arguments : Array(Argument),
                               column : Int32) : Nil
-      action_width = column - INDENT - 2
-      help_width = Math.max(@width - column, 11)
-
       arguments.each do |argument|
-        header = invocation(argument)
-        io << " " * INDENT
-        help_text = argument.help
-        if help_text.nil? || help_text.is_a?(Suppress)
-          io << header << '\n'
-          next
+        write_action(io, argument, column, INDENT)
+        if subparsers = argument.subparsers
+          subparsers.choices_actions.each do |choice|
+            write_action(io, choice, column, INDENT * 2)
+          end
         end
-
-        if header.size <= action_width
-          io << header << " " * (action_width - header.size + 2)
-          first_line_column = 0
-        else
-          io << header << '\n'
-          first_line_column = column
-        end
-
-        expanded = expand_help(argument, help_text)
-        if expanded.strip.empty?
-          io << '\n'
-          next
-        end
-        lines = wrap_text(expanded, help_width)
-        io << " " * first_line_column << lines.first << '\n'
-        lines[1..].each { |line| io << " " * column << line << '\n' }
       end
       io << '\n'
+    end
+
+    private def write_action(io : IO, argument : Argument, column : Int32,
+                             indent : Int32) : Nil
+      action_width = column - indent - 2
+      help_width = Math.max(@width - column, 11)
+      header = invocation(argument)
+      io << " " * indent
+      help_text = argument.help
+      if help_text.nil? || help_text.is_a?(Suppress)
+        io << header << '\n'
+        return
+      end
+
+      if header.size <= action_width
+        io << header << " " * (action_width - header.size + 2)
+        first_line_column = 0
+      else
+        io << header << '\n'
+        first_line_column = column
+      end
+
+      expanded = expand_help(argument, help_text)
+      if expanded.strip.empty?
+        io << '\n'
+        return
+      end
+      lines = wrap_text(expanded, help_width)
+      io << " " * first_line_column << lines.first << '\n'
+      lines[1..].each { |line| io << " " * column << line << '\n' }
     end
 
     # Expands `%(prog)s` and friends in description/epilog/usage text.
