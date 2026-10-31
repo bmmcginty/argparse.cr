@@ -106,7 +106,7 @@ the expectations are Python's, not hand-written approximations:
 
 ```console
 $ crystal spec
-980 examples, 0 failures
+1001 examples, 0 failures
 ```
 
 * `spec/fixtures/cpython_test_argparse.json` holds the data driven
@@ -130,7 +130,8 @@ Error messages, exit statuses, `parse_known_args` behaviour, `--` handling,
 namespace defaults, mutually exclusive groups, argument files, intermixed
 parsing, formatters, custom actions, deprecation warnings, and suggestions are
 additionally covered by hand-written specs in `spec/argparse_spec.cr` and
-`spec/feature_parity_spec.cr`.
+`spec/feature_parity_spec.cr`.  `spec/usage_guide_spec.cr` is a short,
+feature-by-feature usage guide for the same API.
 
 ### Not implemented
 
