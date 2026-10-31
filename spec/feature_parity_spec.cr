@@ -164,3 +164,89 @@ describe "subparsers" do
     end
   end
 end
+
+private class SplitLineParser < Argparse::ArgumentParser
+  def convert_arg_line_to_args(arg_line : String) : Array(String)
+    arg_line.split(/\s+/).reject(&.empty?)
+  end
+end
+
+describe "argument files" do
+  it "expands fromfile references recursively" do
+    dir = Dir.tempdir
+    hello = File.join(dir, "argparse-hello-#{Process.pid}")
+    recursive = File.join(dir, "argparse-recursive-#{Process.pid}")
+    File.write(hello, "hello world\n")
+    File.write(recursive, "-a\nA\n@#{hello}")
+    begin
+      parser = Argparse::ArgumentParser.new(prog: "PROG", fromfile_prefix_chars: "@", exit_on_error: false)
+      parser.add_argument("-a")
+      parser.add_argument("x")
+      parser.add_argument("y", nargs: "+")
+      parser.parse_args(["X", "@#{recursive}", "Z"]).should eq(
+        values(a: "A", x: "X", y: ["hello world", "Z"] of Argparse::Value))
+    ensure
+      File.delete(hello) rescue nil
+      File.delete(recursive) rescue nil
+    end
+  end
+
+  it "uses convert_arg_line_to_args to split lines" do
+    path = File.join(Dir.tempdir, "argparse-split-#{Process.pid}")
+    File.write(path, "hello world\n")
+    begin
+      parser = SplitLineParser.new(prog: "PROG", fromfile_prefix_chars: "@", exit_on_error: false)
+      parser.add_argument("y", nargs: "+")
+      parser.parse_args(["@#{path}", "X"]).should eq(
+        values(y: ["hello", "world", "X"] of Argparse::Value))
+    ensure
+      File.delete(path) rescue nil
+    end
+  end
+end
+
+describe "intermixed parsing" do
+  it "collects positionals around optionals" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--foo")
+    parser.add_argument("--bar", required: true)
+    parser.add_argument("cmd")
+    parser.add_argument("rest", nargs: "*", type: "int")
+    argv = ["cmd", "--foo", "x", "1", "--bar", "y", "2", "3"]
+    parser.parse_intermixed_args(argv).should eq(
+      values(foo: "x", bar: "y", cmd: "cmd", rest: [1_i64, 2_i64, 3_i64] of Argparse::Value))
+  end
+
+  it "leaves unknown options in extras" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--foo")
+    parser.add_argument("--bar", required: true)
+    parser.add_argument("cmd")
+    parser.add_argument("rest", nargs: "*", type: "int")
+    namespace, extras = parser.parse_known_intermixed_args(
+      ["cmd", "--foo", "x", "--error", "1", "2", "--bar", "y", "3"])
+    namespace.should eq(values(foo: "x", bar: "y", cmd: "cmd", rest: [1_i64, 2_i64, 3_i64] of Argparse::Value))
+    extras.should eq(["--error"])
+  end
+
+  it "rejects positional remainder arguments" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("x")
+    parser.add_argument("y", nargs: "...")
+    expect_raises(Argparse::ConfigurationError, /nargs=\.\.\./) do
+      parser.parse_intermixed_args(["X", "A"])
+    end
+  end
+end
+
+describe "parse namespace" do
+  it "fills an existing namespace without replacing existing keys" do
+    parser = Argparse::ArgumentParser.new(prog: "PROG", exit_on_error: false)
+    parser.add_argument("--foo")
+    parser.add_argument("bar")
+    namespace = values(foo: "old", extra: 1_i64)
+    result = parser.parse_args(["--foo", "new", "value"], namespace)
+    result.should be(namespace)
+    result.should eq(values(foo: "new", bar: "value", extra: 1_i64))
+  end
+end

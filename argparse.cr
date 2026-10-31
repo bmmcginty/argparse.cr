@@ -368,6 +368,7 @@ module Argparse
                    description : String? = nil, epilog : String? = nil,
                    parents : Array(ArgumentParser) = [] of ArgumentParser,
                    prefix_chars : String = "-",
+                   fromfile_prefix_chars : String? = nil,
                    argument_default : Object? = UNSET,
                    conflict_handler : String = "error",
                    add_help : Bool = true, allow_abbrev : Bool = true,
@@ -389,7 +390,7 @@ module Argparse
         allow_abbrev: allow_abbrev,
         argument_default: Argparse.normalize(argument_default),
         conflict_handler: conflict_handler, exit_on_error: exit_on_error,
-        width: width)
+        fromfile_prefix_chars: fromfile_prefix_chars, width: width)
 
       if help
         metavar = aliases.empty? ? name : "#{name} (#{aliases.join(", ")})"
@@ -475,6 +476,7 @@ module Argparse
     property namespace : Namespace
     property positionals : Array(Argument)
     getter extras = [] of String
+    getter extras_pattern = [] of Char
     getter seen_actions = Set(Argument).new
     getter seen_non_default = Set(Argument).new
 
@@ -498,6 +500,7 @@ module Argparse
     getter add_help : Bool
     getter prefix_chars : String
     getter allow_abbrev : Bool
+    getter fromfile_prefix_chars : String?
     getter argument_default : Spec
     getter conflict_handler : String
     # Width of the formatter, like Python's `HelpFormatter` width (the
@@ -522,6 +525,7 @@ module Argparse
                    parents : Array(ArgumentParser) = [] of ArgumentParser,
                    @add_help : Bool = true, @prefix_chars : String = "-",
                    @allow_abbrev : Bool = true,
+                   @fromfile_prefix_chars : String? = nil,
                    @argument_default : Spec = UNSET,
                    conflict_handler : String = "error",
                    @exit_on_error : Bool = true,
@@ -963,8 +967,9 @@ module Argparse
     # Parsing
     # ---------------------------------------------------------------
 
-    def parse_args(args : Enumerable(String) = ARGV) : Namespace
-      namespace, extras = parse_known_args(args)
+    def parse_args(args : Enumerable(String) = ARGV,
+                   namespace : Namespace? = nil) : Namespace
+      result, extras = parse_known_args(args, namespace)
       unless extras.empty?
         message = "unrecognized arguments: #{extras.join(' ')}"
         if @exit_on_error
@@ -973,15 +978,48 @@ module Argparse
           raise ArgumentError.new(message)
         end
       end
-      namespace
+      result
     end
 
-    def parse(args : Enumerable(String) = ARGV) : Namespace
-      parse_args(args)
+    def parse(args : Enumerable(String) = ARGV,
+              namespace : Namespace? = nil) : Namespace
+      parse_args(args, namespace)
     end
 
-    def parse_known_args(args : Enumerable(String) = ARGV) : Tuple(Namespace, Array(String))
-      namespace = Namespace.new
+    def parse_known_args(args : Enumerable(String) = ARGV,
+                         namespace : Namespace? = nil) : Tuple(Namespace, Array(String))
+      parse_known_args_mode(args, namespace, false)
+    end
+
+    def parse_intermixed_args(args : Enumerable(String) = ARGV,
+                              namespace : Namespace? = nil) : Namespace
+      result, extras = parse_known_intermixed_args(args, namespace)
+      unless extras.empty?
+        message = "unrecognized arguments: #{extras.join(' ')}"
+        if @exit_on_error
+          error(message)
+        else
+          raise ArgumentError.new(message)
+        end
+      end
+      result
+    end
+
+    def parse_known_intermixed_args(args : Enumerable(String) = ARGV,
+                                    namespace : Namespace? = nil) : Tuple(Namespace, Array(String))
+      incompatible = @actions.find do |action|
+        !action.option? && (action.nargs == "A..." || action.nargs == "...")
+      end
+      if incompatible
+        raise ConfigurationError.new("parse_intermixed_args: positional arg with nargs=#{incompatible.nargs}")
+      end
+      parse_known_args_mode(args, namespace, true)
+    end
+
+    private def parse_known_args_mode(args : Enumerable(String),
+                                      namespace : Namespace?,
+                                      intermixed : Bool) : Tuple(Namespace, Array(String))
+      namespace ||= Namespace.new
       @actions.each do |argument|
         next if argument.dest_suppressed
         next if namespace.has_key?(argument.dest)
@@ -995,7 +1033,7 @@ module Argparse
         namespace[dest] = clone_value(default)
       end
       begin
-        extras = parse_known_args_impl(args.to_a, namespace)
+        extras = parse_known_args_impl(args.to_a, namespace, intermixed)
       rescue ex : ArgumentError
         raise ex unless @exit_on_error
         error(ex.message || "")
@@ -1010,7 +1048,43 @@ module Argparse
       exit(2)
     end
 
-    private def parse_known_args_impl(arg_strings : Array(String), namespace : Namespace) : Array(String)
+    # Reads arguments from files named by `fromfile_prefix_chars`.  Each line
+    # is passed through `convert_arg_line_to_args`, which subclasses can
+    # override to split or transform lines.
+    private def read_args_from_files(arg_strings : Array(String)) : Array(String)
+      chars = @fromfile_prefix_chars
+      return arg_strings unless chars
+      result = [] of String
+      arg_strings.each do |arg_string|
+        if arg_string.empty? || !chars.includes?(arg_string[0])
+          result << arg_string
+          next
+        end
+        begin
+          path = arg_string[1..]
+          file_args = [] of String
+          File.read(path).lines.each do |line|
+            file_args.concat(convert_arg_line_to_args(line))
+          end
+          result.concat(read_args_from_files(file_args))
+        rescue ex
+          raise ArgumentError.new(ex.message || "cannot read arguments from #{arg_string.inspect}")
+        end
+      end
+      result
+    end
+
+    # Converts one line from a fromfile argument file.  The default returns
+    # the line unchanged, like CPython.
+    def convert_arg_line_to_args(arg_line : String) : Array(String)
+      [arg_line]
+    end
+
+    private def parse_known_args_impl(arg_strings : Array(String), namespace : Namespace,
+                                      intermixed : Bool = false) : Array(String)
+      if @fromfile_prefix_chars
+        arg_strings = read_args_from_files(arg_strings)
+      end
       pattern, option_string_indices = classify(arg_strings)
       run = ParseRun.new(namespace, @actions)
 
@@ -1023,7 +1097,7 @@ module Argparse
           next_option_string_index += 1
         end
 
-        if start_index != next_option_string_index
+        if !intermixed && start_index != next_option_string_index
           positionals_end_index = consume_positionals(run, arg_strings, pattern, start_index)
           if positionals_end_index > start_index
             start_index = positionals_end_index
@@ -1036,6 +1110,7 @@ module Argparse
           extras_index = start_index
           while extras_index < next_option_string_index && extras_index < arg_strings.size
             run.extras << arg_strings[extras_index]
+            run.extras_pattern << pattern[extras_index]
             extras_index += 1
           end
           start_index = next_option_string_index
@@ -1044,10 +1119,42 @@ module Argparse
         start_index = consume_optional(run, arg_strings, pattern, option_string_indices, start_index)
       end
 
-      stop_index = consume_positionals(run, arg_strings, pattern, start_index)
-      while stop_index < arg_strings.size
-        run.extras << arg_strings[stop_index]
-        stop_index += 1
+      if !intermixed
+        stop_index = consume_positionals(run, arg_strings, pattern, start_index)
+        while stop_index < arg_strings.size
+          run.extras << arg_strings[stop_index]
+          run.extras_pattern << pattern[stop_index]
+          stop_index += 1
+        end
+      else
+        if start_index < arg_strings.size
+          (start_index...arg_strings.size).each do |index|
+            run.extras << arg_strings[index]
+            run.extras_pattern << pattern[index]
+          end
+        end
+        extras = run.extras.dup
+        extras_pattern = run.extras_pattern.dup
+        run.extras.clear
+        run.extras_pattern.clear
+        filtered_args = [] of String
+        filtered_pattern = String::Builder.new
+        extras.each_with_index do |value, index|
+          next if extras_pattern[index] == 'O'
+          filtered_args << value
+          filtered_pattern << extras_pattern[index]
+        end
+        consumed = consume_positionals(run, filtered_args, filtered_pattern.to_s, 0)
+        remaining = consumed
+        extras.each_with_index do |value, index|
+          if extras_pattern[index] == 'O'
+            run.extras << value
+          elsif remaining > 0
+            remaining -= 1
+          else
+            run.extras << value
+          end
+        end
       end
 
       check_required(run)
@@ -1173,6 +1280,7 @@ module Argparse
         current = action
         if current.nil?
           run.extras << arg_strings[start_index]
+          run.extras_pattern << 'O'
           return start_index + 1
         end
 
@@ -1202,6 +1310,7 @@ module Argparse
               end
             else
               run.extras << "#{char}#{matched_explicit}"
+              run.extras_pattern << 'O'
               return start_index + 1
             end
           elsif arg_count == 1
